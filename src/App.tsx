@@ -6,7 +6,6 @@ import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { About } from './pages/About';
-import { Homework } from './pages/Homework';
 import { SettingsLayout } from './pages/settings/SettingsLayout';
 import { SettingsHome } from './pages/settings/SettingsHome';
 import { PortalManagement } from './pages/settings/PortalManagement';
@@ -22,7 +21,6 @@ export default function App() {
           <Route element={<AuthGuard />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/homework" element={<Homework />} />
               <Route path="/about" element={<About />} />
               <Route element={<PinGate />}>
                 <Route path="/settings" element={<SettingsLayout />}>

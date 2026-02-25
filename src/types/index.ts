@@ -64,6 +64,8 @@ export interface UserProfile {
   parentPinHash: string;
   parentPinSalt: string;
   auditEnabled: boolean;
+  scrapeTime?: string; // HH:MM format, default "16:00"
+  lastScrapedAt?: number;
 }
 
 export const DEFAULT_PORTALS: Omit<Portal, 'id' | 'createdAt' | 'updatedAt'>[] = [

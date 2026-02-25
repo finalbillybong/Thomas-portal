@@ -1,27 +1,19 @@
 #!/usr/bin/env node
 
 /**
- * MCAS (MyChildAtSchool) Homework Scraper
+ * MCAS (MyChildAtSchool) Homework Scraper — Long-running scheduled service
  *
- * Logs into the MCAS parent portal, scrapes the homework page,
- * and writes new homework items to Firestore.
- *
- * Usage:
- *   1. Copy .env.example to .env and fill in your details
- *   2. Place your Firebase service account key as serviceAccountKey.json
- *   3. npm install
- *   4. npm run scrape
- *
- * Can be run as a cron job, e.g.:
- *   0 7,16 * * * cd /path/to/scraper && node scrape-homework.mjs
+ * Reads scrape schedule from Firestore, runs on cron, downloads resource files,
+ * and archives homework items 7 days after their due date.
  */
 
 import { chromium } from 'playwright';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import cron from 'node-cron';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -66,89 +58,42 @@ if (!existsSync(saPath)) {
   process.exit(1);
 }
 
+const DEFAULT_SCRAPE_TIME = '16:00';
+
 const serviceAccount = JSON.parse(readFileSync(saPath, 'utf-8'));
 initializeApp({ credential: cert(serviceAccount) });
-const db = getFirestore();
+const fsDb = getFirestore();
+
+// Ensure directories exist
+mkdirSync(resolve(__dirname, 'debug'), { recursive: true });
+mkdirSync(resolve(__dirname, 'resources'), { recursive: true });
 
 // ── Scrape MCAS ─────────────────────────────────────────────────────────
 async function scrapeHomework() {
   console.log('Launching browser...');
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
+  const context = await browser.newContext({ acceptDownloads: true });
   const page = await context.newPage();
 
   try {
     // Login
     console.log('Navigating to MCAS login...');
-    await page.goto('https://www.mychildatschool.com/MCAS/MCSParentLogin', {
-      waitUntil: 'networkidle',
-    });
-
-    // Dump form HTML for debugging selectors
-    const formHtml = await page.evaluate(() => {
-      const forms = document.querySelectorAll('form');
-      const inputs = document.querySelectorAll('input, button[type="submit"]');
-      const info = [];
-      forms.forEach((f, i) => info.push(`FORM[${i}]: action=${f.action} id=${f.id} class=${f.className}`));
-      inputs.forEach((inp) => info.push(`  ${inp.tagName} type=${inp.type} id=${inp.id} name=${inp.name} class=${inp.className} placeholder=${inp.placeholder}`));
-      return info.join('\n');
-    });
-    console.log('Page form elements:\n' + formHtml);
-    await page.screenshot({ path: resolve(__dirname, 'debug/login-page.png'), fullPage: true });
+    await page.goto('https://www.mychildatschool.com/MCAS/MCSParentLogin', { waitUntil: 'networkidle' });
 
     console.log('Logging in...');
-    // Try multiple common selectors for email/username field
     await page.fill('#EmailTextBox', MCAS_EMAIL);
     await page.fill('#PasswordTextBox', MCAS_PASSWORD);
     await page.click('#LoginButton');
-
-    // Wait for post-login navigation
     await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(3000);
+    console.log('Logged in. URL:', page.url());
 
-    console.log('Logged in. Current URL:', page.url());
-
-    // Dump page content for debugging at each step
-    async function dumpPage(label) {
-      const url = page.url();
-      const links = await page.evaluate(() => {
-        return Array.from(document.querySelectorAll('a, button, [onclick]')).map(el => {
-          return `${el.tagName} id=${el.id} class=${el.className} href=${el.href || ''} text="${el.textContent?.trim().slice(0, 80)}"`;
-        }).join('\n');
-      });
-      console.log(`\n--- ${label} ---`);
-      console.log(`URL: ${url}`);
-      console.log(`Clickable elements:\n${links}`);
-      console.log(`--- end ${label} ---\n`);
-    }
-
-    await dumpPage('After login');
-    await page.screenshot({ path: resolve(__dirname, 'debug/after-login.png'), fullPage: true });
-
-    // Handle combined child+school selection (MCSContactSelect page)
-    // Page shows multiple rows, each with a child name + school.
-    // We need to click the row that contains BOTH the child name and school name.
+    // Handle contact selection page
     if (page.url().includes('ContactSelect')) {
       console.log('On contact selection page...');
-
-      // Dump full page HTML for debugging (the links have no visible text)
-      const pageInfo = await page.evaluate(() => {
-        const items = document.querySelectorAll('.avatar-container-item, a');
-        return Array.from(items).map((el, i) => {
-          return `[${i}] tag=${el.tagName} class=${el.className} href=${el.href} innerHTML=${el.innerHTML.slice(0, 200)}`;
-        }).join('\n');
-      });
-      console.log('Contact page elements:\n' + pageInfo);
-
-      // The avatar-container-item links seem to be the selection items
-      // Since there are 3, and the user wants the bottom (last) one for John Spendluffe
-      // Click the last avatar-container-item (index -1)
       const avatarItems = page.locator('.avatar-container-item');
       const count = await avatarItems.count();
-      console.log(`Found ${count} avatar-container-item elements`);
-
       if (count > 0) {
-        // Click the last one (bottom entry = John Spendluffe)
         const lastItem = avatarItems.nth(count - 1);
         console.log(`Clicking avatar item ${count - 1} (last/bottom)...`);
         await Promise.all([
@@ -158,16 +103,10 @@ async function scrapeHomework() {
         await page.waitForLoadState('domcontentloaded');
         await page.waitForTimeout(3000);
         console.log('After contact selection, URL:', page.url());
-        await page.screenshot({ path: resolve(__dirname, 'debug/after-contact.png'), fullPage: true });
-      } else {
-        console.log('No avatar-container-item elements found');
-        await page.screenshot({ path: resolve(__dirname, 'debug/contact-selection-fail.png'), fullPage: true });
       }
     }
 
-    // Navigate to homework section
-    await dumpPage('Before homework nav');
-    // Navigate to homework page directly
+    // Navigate to homework page
     console.log('Navigating to homework page...');
     await page.goto('https://www.mychildatschool.com/MCAS/MCSHomework', { waitUntil: 'networkidle' });
     await page.waitForTimeout(2000);
@@ -180,7 +119,7 @@ async function scrapeHomework() {
 
     // Scrape homework items from MCAS homework table
     // Table columns: School | Subject | Homework Title | Subject Teacher | Assigned Date | Due Date | Resources | Score | ...
-    const items = await page.evaluate(() => {
+    const tableData = await page.evaluate(() => {
       const homework = [];
 
       // Find the homework table by looking for a table with the right headers
@@ -231,43 +170,120 @@ async function scrapeHomework() {
         const setDate = colMap.setDate !== undefined ? cells[colMap.setDate]?.textContent?.trim() : undefined;
         const teacher = colMap.teacher !== undefined ? cells[colMap.teacher]?.textContent?.trim() : undefined;
 
-        // Grab resource info (e.g. "2 Files") and any download links
-        let resources = null;
+        // Check if resources cell has content
+        let hasResources = false;
+        let resourceText = null;
         if (colMap.resources !== undefined && cells[colMap.resources]) {
-          const resCell = cells[colMap.resources];
-          const resText = resCell.textContent?.trim();
+          const resText = cells[colMap.resources].textContent?.trim();
           if (resText && resText !== 'N/A') {
-            const links = Array.from(resCell.querySelectorAll('a')).map(a => ({
-              name: a.textContent?.trim(),
-              url: a.href,
-            }));
-            resources = { text: resText, links };
+            hasResources = true;
+            resourceText = resText;
           }
         }
 
         if (title && title !== 'N/A') {
-          homework.push({ title, subject, dueDate, setDate, teacher, resources });
+          homework.push({ title, subject, dueDate, setDate, teacher, hasResources, resourceText });
         }
       }
 
-      return { items: homework, debug: `colMap: ${JSON.stringify(colMap)}, rows: ${homeworkTable.querySelectorAll('tbody tr').length}`, html: null };
+      return { items: homework, colMap, tableFound: true };
     });
 
-    if (items.debug) {
-      console.log('Table parsing info:', items.debug);
-    }
-
-    if (items.html) {
-      console.log('\n--- Could not find homework table. Page HTML preview: ---');
-      console.log(items.html);
-      console.log('--- End HTML preview ---\n');
+    if (!tableData.tableFound) {
+      console.log('Could not find homework table on page');
       await browser.close();
       return [];
     }
 
-    console.log(`Found ${items.items.length} homework items`);
+    console.log(`Found ${tableData.items.length} homework items`);
+
+    // ── Resource downloading ──────────────────────────────────────────
+    for (let i = 0; i < tableData.items.length; i++) {
+      const item = tableData.items[i];
+      if (!item.hasResources) {
+        item.resources = null;
+        continue;
+      }
+
+      console.log(`Fetching resources for: ${item.title}...`);
+      try {
+        const resColIdx = tableData.colMap.resources + 1;
+        const resCell = page.locator(`table tbody tr:nth-child(${i + 1}) td:nth-child(${resColIdx})`);
+        const clickTarget = resCell.locator('a, button, [onclick]').first();
+        const hasClickable = await clickTarget.count();
+
+        if (hasClickable > 0) {
+          await clickTarget.click();
+        } else {
+          await resCell.click();
+        }
+        await page.waitForTimeout(2000);
+        await page.screenshot({ path: resolve(__dirname, `debug/resource-popup-${i}.png`), fullPage: true });
+
+        // Grab file links from any modal/popup
+        const fileLinks = await page.evaluate(() => {
+          const links = [];
+          const containers = document.querySelectorAll(
+            '.modal, .popup, [class*="modal"], [class*="dialog"], [role="dialog"], .fancybox-inner, .fancybox-wrap, .modal-body, .modal-content'
+          );
+          for (const c of containers) {
+            for (const a of c.querySelectorAll('a[href]')) {
+              if (a.href && !a.href.includes('javascript:') && !a.href.endsWith('#')) {
+                links.push({ name: a.textContent?.trim() || 'file', url: a.href });
+              }
+            }
+          }
+          if (links.length === 0) {
+            for (const a of document.querySelectorAll('a[href*="Download"], a[href*="download"], a[href*=".pdf"], a[href*=".doc"]')) {
+              links.push({ name: a.textContent?.trim() || 'file', url: a.href });
+            }
+          }
+          return links;
+        });
+
+        if (fileLinks.length > 0) {
+          console.log(`  Found ${fileLinks.length} file links`);
+          const downloadedFiles = [];
+          for (const link of fileLinks) {
+            try {
+              const downloadPromise = page.waitForEvent('download', { timeout: 15000 }).catch(() => null);
+              await page.evaluate((url) => { window.open(url, '_blank'); }, link.url);
+              const download = await downloadPromise;
+              if (download) {
+                const filename = download.suggestedFilename();
+                const safeName = `${item.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${filename}`;
+                await download.saveAs(resolve(__dirname, 'resources', safeName));
+                console.log(`  Downloaded: ${safeName}`);
+                downloadedFiles.push({ name: filename, path: safeName });
+              } else {
+                downloadedFiles.push({ name: link.name, url: link.url });
+              }
+            } catch (dlErr) {
+              console.log(`  Download failed: ${dlErr.message}`);
+              downloadedFiles.push({ name: link.name, url: link.url });
+            }
+          }
+          item.resources = { text: item.resourceText, links: downloadedFiles };
+        } else {
+          console.log('  No file links found in popup');
+          item.resources = { text: item.resourceText, links: [] };
+        }
+
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(500);
+      } catch (resErr) {
+        console.log(`  Resource fetch failed: ${resErr.message}`);
+        item.resources = { text: item.resourceText, links: [] };
+      }
+    }
+
+    // Set null resources for items without
+    for (const item of tableData.items) {
+      if (!item.hasResources && !item.resources) item.resources = null;
+    }
+
     await browser.close();
-    return items.items;
+    return tableData.items;
   } catch (err) {
     console.error('Scrape failed:', err.message);
     await page.screenshot({ path: resolve(__dirname, 'debug/error.png'), fullPage: true });
@@ -308,14 +324,13 @@ function parseDate(dateStr) {
 
 // ── Write to Firestore ──────────────────────────────────────────────────
 async function syncToFirestore(items) {
-  const colRef = db.collection(`users/${FIREBASE_UID}/homework`);
+  const colRef = fsDb.collection(`users/${FIREBASE_UID}/homework`);
 
-  // Get existing MCAS items to deduplicate
   const existing = await colRef.where('source', '==', 'mcas').get();
-  const existingTitles = new Set();
-  existing.forEach((doc) => {
-    const data = doc.data();
-    existingTitles.add(`${data.title}__${data.dueDate}`);
+  const existingKeys = new Set();
+  existing.forEach((d) => {
+    const data = d.data();
+    existingKeys.add(`${data.title}__${data.dueDate}`);
   });
 
   let added = 0;
@@ -324,17 +339,17 @@ async function syncToFirestore(items) {
   for (const item of items) {
     const dueDate = parseDate(item.dueDate);
     if (!item.title || !dueDate) {
-      console.log(`Skipping item (missing title or unparseable date): ${JSON.stringify(item)}`);
+      console.log(`Skipping (missing title/date): ${JSON.stringify(item)}`);
       continue;
     }
 
     const dedupeKey = `${item.title}__${dueDate}`;
-    if (existingTitles.has(dedupeKey)) {
+    if (existingKeys.has(dedupeKey)) {
       console.log(`Already exists: ${item.title} (due ${dueDate})`);
       continue;
     }
 
-    const doc = {
+    await colRef.add({
       title: item.title,
       subject: item.subject || 'Unknown',
       dueDate,
@@ -347,29 +362,108 @@ async function syncToFirestore(items) {
       mcasId: dedupeKey,
       createdAt: now,
       updatedAt: now,
-    };
-
-    await colRef.add(doc);
+    });
     const resInfo = item.resources ? ` [${item.resources.text}]` : '';
     console.log(`Added: ${item.title} — ${item.subject} (due ${dueDate}, teacher: ${item.teacher || 'N/A'})${resInfo}`);
     added++;
   }
 
-  console.log(`\nSync complete: ${added} new items added, ${items.length - added} skipped/existing`);
+  console.log(`Sync: ${added} new, ${items.length - added} skipped`);
 }
 
-// ── Main ────────────────────────────────────────────────────────────────
-async function main() {
-  console.log('=== MCAS Homework Scraper ===\n');
+// ── Archive old homework (7+ days past due) ─────────────────────────────
+async function archiveOldHomework() {
+  const colRef = fsDb.collection(`users/${FIREBASE_UID}/homework`);
+  const archiveRef = fsDb.collection(`users/${FIREBASE_UID}/homeworkArchive`);
+  const allDocs = await colRef.get();
+  const now = new Date();
+  let archived = 0;
 
-  const items = await scrapeHomework();
-  if (items.length === 0) {
-    console.log('No homework items found. Check debug screenshot and update selectors if needed.');
-    return;
+  for (const snap of allDocs.docs) {
+    const data = snap.data();
+    if (!data.dueDate) continue;
+    const due = new Date(data.dueDate + 'T23:59:59');
+    const daysPast = (now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysPast > 7) {
+      await archiveRef.doc(snap.id).set({ ...data, archivedAt: Date.now() });
+      await colRef.doc(snap.id).delete();
+      console.log(`Archived: ${data.title} (due ${data.dueDate})`);
+      archived++;
+    }
   }
+  if (archived > 0) console.log(`Archived ${archived} old homework items`);
+}
 
-  await syncToFirestore(items);
-  console.log('\nDone!');
+// ── Update last-scraped timestamp ───────────────────────────────────────
+async function updateLastScraped() {
+  const ref = fsDb.collection('users').doc(FIREBASE_UID);
+  await ref.set({ lastScrapedAt: Date.now() }, { merge: true });
+}
+
+// ── Run a full scrape cycle ─────────────────────────────────────────────
+async function runScrape() {
+  const ts = new Date().toLocaleString('en-GB', { timeZone: 'Europe/London' });
+  console.log(`\n=== MCAS Scrape — ${ts} ===\n`);
+
+  try {
+    await archiveOldHomework();
+    const items = await scrapeHomework();
+    if (items.length === 0) {
+      console.log('No homework items found.');
+    } else {
+      await syncToFirestore(items);
+    }
+    await updateLastScraped();
+    console.log('Scrape complete!');
+  } catch (err) {
+    console.error('Scrape run failed:', err.message);
+  }
+}
+
+// ── Read schedule from Firestore ────────────────────────────────────────
+async function getScrapeTime() {
+  try {
+    const snap = await fsDb.collection('users').doc(FIREBASE_UID).get();
+    if (snap.exists && snap.data()?.scrapeTime) return snap.data().scrapeTime;
+  } catch (err) {
+    console.error('Failed to read scrapeTime:', err.message);
+  }
+  return DEFAULT_SCRAPE_TIME;
+}
+
+function timeToCron(time) {
+  const [h, m] = time.split(':').map(Number);
+  return `${m} ${h} * * *`;
+}
+
+// ── Main — Long-running scheduled service ───────────────────────────────
+async function main() {
+  console.log('=== MCAS Homework Scraper Service ===');
+  console.log(`UID: ${FIREBASE_UID}`);
+
+  // Run once on startup
+  await runScrape();
+
+  // Set up cron
+  let currentTime = await getScrapeTime();
+  let cronExpr = timeToCron(currentTime);
+  console.log(`\nScheduled daily at ${currentTime} (${cronExpr})`);
+
+  let task = cron.schedule(cronExpr, () => runScrape(), { timezone: 'Europe/London' });
+
+  // Re-check schedule every 30 min
+  setInterval(async () => {
+    const newTime = await getScrapeTime();
+    if (newTime !== currentTime) {
+      console.log(`Schedule changed: ${currentTime} -> ${newTime}`);
+      currentTime = newTime;
+      task.stop();
+      task = cron.schedule(timeToCron(newTime), () => runScrape(), { timezone: 'Europe/London' });
+      console.log(`Rescheduled to ${newTime}`);
+    }
+  }, 30 * 60 * 1000);
+
+  console.log('Service running. Checking for schedule changes every 30 min.\n');
 }
 
 main().catch((err) => {

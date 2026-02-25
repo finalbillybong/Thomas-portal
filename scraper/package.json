@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "scrape": "node scrape-homework.mjs"
+    "scrape": "node scrape-homework.mjs",
+    "start": "node scrape-homework.mjs"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0",
+    "node-cron": "^3.0.3",
     "playwright": "^1.49.0"
   }
 }

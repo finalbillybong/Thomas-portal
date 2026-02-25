@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePortalCheck } from '../../hooks/usePortalCheck';
 import { logAuditEvent } from '../../lib/auditLog';
@@ -7,6 +8,7 @@ import { db } from '../../lib/firebase';
 export function SettingsHome() {
   const { user, profile, refreshProfile } = useAuth();
   const { resetToday } = usePortalCheck();
+  const [scrapeTime, setScrapeTime] = useState(profile?.scrapeTime || '16:00');
 
   async function handleResetToday() {
     if (!confirm('Reset all checked portals for today?')) return;
@@ -24,6 +26,14 @@ export function SettingsHome() {
       { auditEnabled: !profile.auditEnabled },
       { merge: true },
     );
+    await refreshProfile();
+  }
+
+  async function handleScrapeTimeChange(newTime: string) {
+    setScrapeTime(newTime);
+    if (!user) return;
+    const ref = doc(db, 'users', user.uid);
+    await setDoc(ref, { scrapeTime: newTime }, { merge: true });
     await refreshProfile();
   }
 
@@ -54,6 +64,19 @@ export function SettingsHome() {
           />
           <span className="toggle-slider" />
         </label>
+      </div>
+
+      <div className="setting-row">
+        <div>
+          <strong>Homework scrape time</strong>
+          <p>When to check MCAS for new homework daily</p>
+        </div>
+        <input
+          type="time"
+          value={scrapeTime}
+          onChange={(e) => handleScrapeTimeChange(e.target.value)}
+          className="time-input"
+        />
       </div>
     </div>
   );

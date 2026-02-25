@@ -9,7 +9,6 @@ export function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isSettings = location.pathname.startsWith('/settings');
-  const isHomework = location.pathname === '/homework';
 
   async function handleLogout() {
     if (user && profile) {
@@ -34,15 +33,6 @@ export function Layout() {
           </button>
           {menuOpen && (
             <div className="dropdown-menu">
-              {!isHomework && (
-                <Link
-                  to="/homework"
-                  onClick={() => setMenuOpen(false)}
-                  className="dropdown-item"
-                >
-                  Homework
-                </Link>
-              )}
               {!isSettings && (
                 <Link
                   to="/settings"

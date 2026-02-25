@@ -733,38 +733,28 @@ body {
   flex-shrink: 0;
 }
 
-/* ===== Homework Page ===== */
-.hw-page {
+/* ===== Homework Section ===== */
+.hw-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
-.hw-header {
+.hw-section-header {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
 }
 
-.hw-header h2 {
+.hw-section-header h2 {
   font-size: 1.15rem;
+  margin: 0;
 }
 
-.hw-add-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: var(--color-surface);
-  padding: 16px;
-  border-radius: var(--radius);
-}
-
-.hw-add-form input {
-  padding: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: 1rem;
-  color: var(--color-text);
+.hw-last-scraped {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
 }
 
 .hw-empty {
@@ -787,6 +777,16 @@ body {
   background: var(--color-surface);
   border: 2px solid var(--color-border);
   border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+}
+
+.hw-colour-strip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
 }
 
 .hw-card--done {
@@ -843,36 +843,32 @@ body {
   flex-shrink: 0;
 }
 
-.hw-due {
+.hw-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: 4px 8px;
+  border-radius: 6px;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 700;
+  background: var(--color-bg);
   color: var(--color-text-muted);
 }
 
-.hw-overdue {
+.hw-badge--overdue {
+  background: #fef2f2;
   color: var(--color-danger);
 }
 
-.hw-due-today {
-  color: #f59e0b;
+.hw-badge--today {
+  background: #fefce8;
+  color: #b45309;
 }
 
-.hw-due-soon {
+.hw-badge--soon {
+  background: #fff7ed;
   color: #ea580c;
-}
-
-.hw-delete {
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font-size: 1.2rem;
-  padding: 0;
-  line-height: 1;
-}
-
-.hw-delete:hover {
-  color: var(--color-danger);
 }
 
 .hw-completed-section {
