@@ -108,45 +108,62 @@ async function scrapeHomework() {
 
     console.log('Logged in. Current URL:', page.url());
 
-    // Handle child account selection
-    // MCAS shows a list of children to pick from when the parent has multiple
-    const childLink = await page.$(`a:has-text("${MCAS_CHILD_NAME}"), button:has-text("${MCAS_CHILD_NAME}"), [class*="student"]:has-text("${MCAS_CHILD_NAME}"), [class*="child"]:has-text("${MCAS_CHILD_NAME}"), [class*="pupil"]:has-text("${MCAS_CHILD_NAME}")`);
+    // Dump page content for debugging at each step
+    async function dumpPage(label) {
+      const url = page.url();
+      const links = await page.evaluate(() => {
+        return Array.from(document.querySelectorAll('a, button, [onclick]')).map(el => {
+          return `${el.tagName} id=${el.id} class=${el.className} href=${el.href || ''} text="${el.textContent?.trim().slice(0, 80)}"`;
+        }).join('\n');
+      });
+      console.log(`\n--- ${label} ---`);
+      console.log(`URL: ${url}`);
+      console.log(`Clickable elements:\n${links}`);
+      console.log(`--- end ${label} ---\n`);
+    }
+
+    await dumpPage('After login');
+    await page.screenshot({ path: resolve(__dirname, 'debug/after-login.png'), fullPage: true });
+
+    // Handle child account selection (MCSContactSelect page)
+    // Try clicking any element containing the child name
+    const childLink = await page.$(`text=${MCAS_CHILD_NAME}`);
     if (childLink) {
       console.log(`Selecting child: ${MCAS_CHILD_NAME}`);
       await childLink.click();
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
+      await dumpPage('After child selection');
+      await page.screenshot({ path: resolve(__dirname, 'debug/after-child.png'), fullPage: true });
     } else {
-      // Maybe no selection screen, or different layout — save a screenshot for debugging
-      console.log(`No child selection found for "${MCAS_CHILD_NAME}" — may already be selected or page layout differs`);
+      console.log(`No child selection found for "${MCAS_CHILD_NAME}"`);
       await page.screenshot({ path: resolve(__dirname, 'debug/child-selection.png'), fullPage: true });
     }
 
     // Handle school selection
-    const schoolLink = await page.$(`a:has-text("${MCAS_SCHOOL_NAME}"), button:has-text("${MCAS_SCHOOL_NAME}"), [class*="school"]:has-text("${MCAS_SCHOOL_NAME}"), [class*="estab"]:has-text("${MCAS_SCHOOL_NAME}")`);
+    const schoolLink = await page.$(`text=${MCAS_SCHOOL_NAME}`);
     if (schoolLink) {
       console.log(`Selecting school: ${MCAS_SCHOOL_NAME}`);
       await schoolLink.click();
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
+      await dumpPage('After school selection');
+      await page.screenshot({ path: resolve(__dirname, 'debug/after-school.png'), fullPage: true });
     } else {
-      console.log(`No school selection found for "${MCAS_SCHOOL_NAME}" — may already be selected or page layout differs`);
+      console.log(`No school selection found for "${MCAS_SCHOOL_NAME}"`);
       await page.screenshot({ path: resolve(__dirname, 'debug/school-selection.png'), fullPage: true });
     }
 
     // Navigate to homework section
-    // MCAS typically has a sidebar/menu with "Homework" link
-    const homeworkLink = await page.$('a:has-text("Homework"), a[href*="homework"], a[href*="Homework"]');
+    await dumpPage('Before homework nav');
+    const homeworkLink = await page.$('a:has-text("Homework"), a[href*="omework"]');
     if (homeworkLink) {
+      console.log('Found Homework link, clicking...');
       await homeworkLink.click();
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
     } else {
-      console.log('Could not find Homework link. Trying direct URL patterns...');
-      // Try common MCAS homework URL patterns
-      const baseUrl = new URL(page.url()).origin;
-      await page.goto(`${baseUrl}/MCAS/Homework`, { waitUntil: 'networkidle' });
-      await page.waitForTimeout(2000);
+      console.log('No Homework link found on page. Check debug screenshots and clickable elements above.');
     }
 
     console.log('On homework page:', page.url());
