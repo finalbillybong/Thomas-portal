@@ -1,0 +1,9 @@
+services:
+  mcas-scraper:
+    build: .
+    env_file: .env
+    volumes:
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+      - ./debug:/app/debug
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=./serviceAccountKey.json

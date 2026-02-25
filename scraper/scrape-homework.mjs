@@ -111,8 +111,8 @@ async function scrapeHomework() {
     console.log('On homework page:', page.url());
 
     // Save screenshot for debugging
-    await page.screenshot({ path: resolve(__dirname, 'debug-homework-page.png'), fullPage: true });
-    console.log('Saved debug screenshot to debug-homework-page.png');
+    await page.screenshot({ path: resolve(__dirname, 'debug/homework-page.png'), fullPage: true });
+    console.log('Saved debug screenshot to debug/homework-page.png');
 
     // Scrape homework items
     // MCAS homework pages typically show a table or card list with:
@@ -172,8 +172,8 @@ async function scrapeHomework() {
     return items.items;
   } catch (err) {
     console.error('Scrape failed:', err.message);
-    await page.screenshot({ path: resolve(__dirname, 'debug-error.png'), fullPage: true });
-    console.log('Saved error screenshot to debug-error.png');
+    await page.screenshot({ path: resolve(__dirname, 'debug/error.png'), fullPage: true });
+    console.log('Saved error screenshot to debug/error.png');
     await browser.close();
     throw err;
   }
