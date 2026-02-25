@@ -1,0 +1,60 @@
+import { useAuth } from '../../contexts/AuthContext';
+import { usePortalCheck } from '../../hooks/usePortalCheck';
+import { logAuditEvent } from '../../lib/auditLog';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+
+export function SettingsHome() {
+  const { user, profile, refreshProfile } = useAuth();
+  const { resetToday } = usePortalCheck();
+
+  async function handleResetToday() {
+    if (!confirm('Reset all checked portals for today?')) return;
+    await resetToday();
+    if (user && profile) {
+      await logAuditEvent(user.uid, profile.auditEnabled, 'RESET_TODAY');
+    }
+  }
+
+  async function toggleAudit() {
+    if (!user || !profile) return;
+    const ref = doc(db, 'users', user.uid);
+    await setDoc(
+      ref,
+      { auditEnabled: !profile.auditEnabled },
+      { merge: true },
+    );
+    await refreshProfile();
+  }
+
+  return (
+    <div className="settings-section">
+      <h2>General Settings</h2>
+
+      <div className="setting-row">
+        <div>
+          <strong>Reset today's checks</strong>
+          <p>Clear all checked portals for today</p>
+        </div>
+        <button className="btn btn-danger" onClick={handleResetToday}>
+          Reset
+        </button>
+      </div>
+
+      <div className="setting-row">
+        <div>
+          <strong>Enable usage logging</strong>
+          <p>Record portal checks and settings changes</p>
+        </div>
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={profile?.auditEnabled ?? false}
+            onChange={toggleAudit}
+          />
+          <span className="toggle-slider" />
+        </label>
+      </div>
+    </div>
+  );
+}
