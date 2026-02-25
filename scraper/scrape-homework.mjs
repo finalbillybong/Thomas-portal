@@ -10,7 +10,7 @@
 import { chromium } from 'playwright';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { readFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cron from 'node-cron';
@@ -251,26 +251,18 @@ async function scrapeHomework() {
           const downloadedFiles = [];
           for (const link of fileLinks) {
             try {
-              // Click the link directly and catch the download event
-              const linkEl = page.locator(`a:text-is("${link.name}")`).first();
-              const hasLink = await linkEl.count();
-
-              let download = null;
-              if (hasLink > 0) {
-                [download] = await Promise.all([
-                  page.waitForEvent('download', { timeout: 15000 }).catch(() => null),
-                  linkEl.click(),
-                ]);
-              }
-
-              if (download) {
-                const filename = download.suggestedFilename();
-                const safeName = `${item.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${filename}`;
-                await download.saveAs(resolve(__dirname, 'resources', safeName));
-                console.log(`  Downloaded: ${safeName}`);
-                downloadedFiles.push({ name: filename, path: safeName });
+              // Download the file directly using the authenticated browser context
+              // (the links are not visible in the popup so we can't click them)
+              const response = await page.context().request.get(link.url);
+              if (response.ok()) {
+                const safeName = `${item.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${link.name}`;
+                const filePath = resolve(__dirname, 'resources', safeName);
+                const buffer = await response.body();
+                writeFileSync(filePath, buffer);
+                console.log(`  Downloaded: ${safeName} (${buffer.length} bytes)`);
+                downloadedFiles.push({ name: link.name, path: safeName });
               } else {
-                console.log(`  No download triggered for: ${link.name}`);
+                console.log(`  HTTP ${response.status()} for: ${link.name}`);
                 downloadedFiles.push({ name: link.name, url: link.url });
               }
             } catch (dlErr) {
