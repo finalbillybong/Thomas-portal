@@ -48,11 +48,12 @@ loadEnv();
 
 const MCAS_EMAIL = process.env.MCAS_EMAIL;
 const MCAS_PASSWORD = process.env.MCAS_PASSWORD;
+const MCAS_CHILD_NAME = process.env.MCAS_CHILD_NAME;
 const FIREBASE_UID = process.env.FIREBASE_UID;
 const SA_KEY_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS || './serviceAccountKey.json';
 
-if (!MCAS_EMAIL || !MCAS_PASSWORD || !FIREBASE_UID) {
-  console.error('Missing required env vars: MCAS_EMAIL, MCAS_PASSWORD, FIREBASE_UID');
+if (!MCAS_EMAIL || !MCAS_PASSWORD || !FIREBASE_UID || !MCAS_CHILD_NAME) {
+  console.error('Missing required env vars: MCAS_EMAIL, MCAS_PASSWORD, MCAS_CHILD_NAME, FIREBASE_UID');
   process.exit(1);
 }
 
@@ -92,6 +93,20 @@ async function scrapeHomework() {
     await page.waitForTimeout(3000);
 
     console.log('Logged in. Current URL:', page.url());
+
+    // Handle child account selection
+    // MCAS shows a list of children to pick from when the parent has multiple
+    const childLink = await page.$(`a:has-text("${MCAS_CHILD_NAME}"), button:has-text("${MCAS_CHILD_NAME}"), [class*="student"]:has-text("${MCAS_CHILD_NAME}"), [class*="child"]:has-text("${MCAS_CHILD_NAME}"), [class*="pupil"]:has-text("${MCAS_CHILD_NAME}")`);
+    if (childLink) {
+      console.log(`Selecting child: ${MCAS_CHILD_NAME}`);
+      await childLink.click();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(2000);
+    } else {
+      // Maybe no selection screen, or different layout — save a screenshot for debugging
+      console.log(`No child selection found for "${MCAS_CHILD_NAME}" — may already be selected or page layout differs`);
+      await page.screenshot({ path: resolve(__dirname, 'debug/child-selection.png'), fullPage: true });
+    }
 
     // Navigate to homework section
     // MCAS typically has a sidebar/menu with "Homework" link
