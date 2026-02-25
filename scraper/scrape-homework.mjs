@@ -84,10 +84,27 @@ async function scrapeHomework() {
       waitUntil: 'networkidle',
     });
 
+    // Dump form HTML for debugging selectors
+    const formHtml = await page.evaluate(() => {
+      const forms = document.querySelectorAll('form');
+      const inputs = document.querySelectorAll('input, button[type="submit"]');
+      const info = [];
+      forms.forEach((f, i) => info.push(`FORM[${i}]: action=${f.action} id=${f.id} class=${f.className}`));
+      inputs.forEach((inp) => info.push(`  ${inp.tagName} type=${inp.type} id=${inp.id} name=${inp.name} class=${inp.className} placeholder=${inp.placeholder}`));
+      return info.join('\n');
+    });
+    console.log('Page form elements:\n' + formHtml);
+    await page.screenshot({ path: resolve(__dirname, 'debug/login-page.png'), fullPage: true });
+
     console.log('Logging in...');
-    await page.fill('#username', MCAS_EMAIL);
-    await page.fill('#password', MCAS_PASSWORD);
-    await page.click('button[type="submit"], input[type="submit"], .login-btn, #login-btn');
+    // Try multiple common selectors for email/username field
+    const emailSelector = '#username, #email, input[name="username"], input[name="email"], input[name="Email"], input[type="email"], input[name="UserId"], #UserId';
+    const passSelector = '#password, input[name="password"], input[name="Password"], input[type="password"]';
+    const submitSelector = 'button[type="submit"], input[type="submit"], .login-btn, #login-btn, .btn-primary';
+
+    await page.fill(emailSelector, MCAS_EMAIL);
+    await page.fill(passSelector, MCAS_PASSWORD);
+    await page.click(submitSelector);
 
     // Wait for post-login navigation
     await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
