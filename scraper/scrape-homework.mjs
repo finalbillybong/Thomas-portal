@@ -151,10 +151,13 @@ async function scrapeHomework() {
         // Click the last one (bottom entry = John Spendluffe)
         const lastItem = avatarItems.nth(count - 1);
         console.log(`Clicking avatar item ${count - 1} (last/bottom)...`);
-        await lastItem.click();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(2000);
-        await dumpPage('After contact selection');
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {}),
+          lastItem.click(),
+        ]);
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForTimeout(3000);
+        console.log('After contact selection, URL:', page.url());
         await page.screenshot({ path: resolve(__dirname, 'debug/after-contact.png'), fullPage: true });
       } else {
         console.log('No avatar-container-item elements found');
