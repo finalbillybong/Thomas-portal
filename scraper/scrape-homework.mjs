@@ -125,46 +125,48 @@ async function scrapeHomework() {
     await dumpPage('After login');
     await page.screenshot({ path: resolve(__dirname, 'debug/after-login.png'), fullPage: true });
 
-    // Handle child account selection (MCSContactSelect page)
-    // Try clicking any element containing the child name
-    const childLink = await page.$(`text=${MCAS_CHILD_NAME}`);
-    if (childLink) {
-      console.log(`Selecting child: ${MCAS_CHILD_NAME}`);
-      await childLink.click();
-      await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(2000);
-      await dumpPage('After child selection');
-      await page.screenshot({ path: resolve(__dirname, 'debug/after-child.png'), fullPage: true });
-    } else {
-      console.log(`No child selection found for "${MCAS_CHILD_NAME}"`);
-      await page.screenshot({ path: resolve(__dirname, 'debug/child-selection.png'), fullPage: true });
-    }
+    // Handle combined child+school selection (MCSContactSelect page)
+    // Page shows multiple rows, each with a child name + school.
+    // We need to click the row that contains BOTH the child name and school name.
+    if (page.url().includes('ContactSelect')) {
+      console.log('On contact selection page, looking for child+school combo...');
 
-    // Handle school selection
-    const schoolLink = await page.$(`text=${MCAS_SCHOOL_NAME}`);
-    if (schoolLink) {
-      console.log(`Selecting school: ${MCAS_SCHOOL_NAME}`);
-      await schoolLink.click();
-      await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(2000);
-      await dumpPage('After school selection');
-      await page.screenshot({ path: resolve(__dirname, 'debug/after-school.png'), fullPage: true });
-    } else {
-      console.log(`No school selection found for "${MCAS_SCHOOL_NAME}"`);
-      await page.screenshot({ path: resolve(__dirname, 'debug/school-selection.png'), fullPage: true });
+      // Find all clickable rows/links, pick the one containing both names
+      const selected = await page.evaluate((childName, schoolName) => {
+        // Look through all links and clickable elements
+        const candidates = document.querySelectorAll('a, tr[onclick], div[onclick], .row, [class*="contact"], [class*="select"]');
+        for (const el of candidates) {
+          const text = el.textContent || '';
+          if (text.includes(schoolName)) {
+            return { found: true, text: text.trim().slice(0, 120), tag: el.tagName, id: el.id, className: el.className };
+          }
+        }
+        return { found: false };
+      }, MCAS_CHILD_NAME, MCAS_SCHOOL_NAME);
+
+      console.log('Selection search result:', JSON.stringify(selected));
+
+      // Click the element containing the school name (since that's unique between the two rows)
+      const contactLink = await page.locator(`a:has-text("${MCAS_SCHOOL_NAME}"), tr:has-text("${MCAS_SCHOOL_NAME}"), div:has-text("${MCAS_SCHOOL_NAME}")`).first();
+      if (await contactLink.count() > 0) {
+        console.log(`Clicking entry for: ${MCAS_SCHOOL_NAME}`);
+        await contactLink.click();
+        await page.waitForLoadState('networkidle');
+        await page.waitForTimeout(2000);
+        await dumpPage('After contact selection');
+        await page.screenshot({ path: resolve(__dirname, 'debug/after-contact.png'), fullPage: true });
+      } else {
+        console.log('Could not find matching contact row');
+        await page.screenshot({ path: resolve(__dirname, 'debug/contact-selection-fail.png'), fullPage: true });
+      }
     }
 
     // Navigate to homework section
     await dumpPage('Before homework nav');
-    const homeworkLink = await page.$('a:has-text("Homework"), a[href*="omework"]');
-    if (homeworkLink) {
-      console.log('Found Homework link, clicking...');
-      await homeworkLink.click();
-      await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(2000);
-    } else {
-      console.log('No Homework link found on page. Check debug screenshots and clickable elements above.');
-    }
+    // Navigate to homework page directly
+    console.log('Navigating to homework page...');
+    await page.goto('https://www.mychildatschool.com/MCAS/MCSHomework', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
 
     console.log('On homework page:', page.url());
 
