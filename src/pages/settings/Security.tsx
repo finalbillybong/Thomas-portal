@@ -19,38 +19,48 @@ export function Security() {
 
     if (!user || !profile) return;
 
-    if (profile.parentPinHash) {
-      const valid = await verifyPin(
-        currentPin,
-        profile.parentPinSalt,
-        profile.parentPinHash,
-      );
-      if (!valid) {
-        setError('Current PIN is incorrect');
+    try {
+      if (profile.parentPinHash) {
+        const valid = await verifyPin(
+          currentPin,
+          profile.parentPinSalt,
+          profile.parentPinHash,
+        );
+        if (!valid) {
+          setError('Current PIN is incorrect');
+          return;
+        }
+      }
+
+      if (newPin.length < 4) {
+        setError('New PIN must be at least 4 digits');
         return;
       }
+
+      if (!/^\d+$/.test(newPin)) {
+        setError('PIN must contain only digits');
+        return;
+      }
+
+      if (newPin !== confirmPin) {
+        setError('New PINs do not match');
+        return;
+      }
+
+      const salt = await generateSalt();
+      const hash = await hashPin(newPin, salt);
+      const ref = doc(db, 'users', user.uid);
+      await setDoc(ref, { parentPinHash: hash, parentPinSalt: salt }, { merge: true });
+      await refreshProfile();
+
+      setCurrentPin('');
+      setNewPin('');
+      setConfirmPin('');
+      setSuccess('PIN changed successfully');
+    } catch (err) {
+      console.error('PIN change failed:', err);
+      setError('Failed to save PIN. Check console for details.');
     }
-
-    if (newPin.length < 4) {
-      setError('New PIN must be at least 4 digits');
-      return;
-    }
-
-    if (newPin !== confirmPin) {
-      setError('New PINs do not match');
-      return;
-    }
-
-    const salt = await generateSalt();
-    const hash = await hashPin(newPin, salt);
-    const ref = doc(db, 'users', user.uid);
-    await setDoc(ref, { parentPinHash: hash, parentPinSalt: salt }, { merge: true });
-    await refreshProfile();
-
-    setCurrentPin('');
-    setNewPin('');
-    setConfirmPin('');
-    setSuccess('PIN changed successfully');
   }
 
   return (

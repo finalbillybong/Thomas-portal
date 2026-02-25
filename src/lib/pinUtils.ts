@@ -6,6 +6,11 @@ export async function generateSalt(): Promise<string> {
 }
 
 export async function hashPin(pin: string, salt: string): Promise<string> {
+  if (!crypto.subtle) {
+    throw new Error(
+      'crypto.subtle is not available. The app must be served over HTTPS (or localhost).',
+    );
+  }
   const encoder = new TextEncoder();
   const data = encoder.encode(salt + pin);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);

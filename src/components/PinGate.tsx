@@ -38,14 +38,19 @@ export function PinGate() {
     if (!profile || !user) return;
     setError('');
 
-    const valid = await verifyPin(pin, profile.parentPinSalt, profile.parentPinHash);
-    if (valid) {
-      setUnlocked(true);
-      sessionStorage.setItem('pinUnlockedAt', String(Date.now()));
-      await logAuditEvent(user.uid, profile.auditEnabled, 'SETTINGS_UNLOCK');
-      setPin('');
-    } else {
-      setError('Incorrect PIN');
+    try {
+      const valid = await verifyPin(pin, profile.parentPinSalt, profile.parentPinHash);
+      if (valid) {
+        setUnlocked(true);
+        sessionStorage.setItem('pinUnlockedAt', String(Date.now()));
+        await logAuditEvent(user.uid, profile.auditEnabled, 'SETTINGS_UNLOCK');
+        setPin('');
+      } else {
+        setError('Incorrect PIN');
+      }
+    } catch (err) {
+      console.error('PIN verify failed:', err);
+      setError('Something went wrong verifying PIN. Check console for details.');
     }
   }
 
@@ -58,21 +63,30 @@ export function PinGate() {
       setError('PIN must be at least 4 digits');
       return;
     }
+    if (!/^\d+$/.test(newPin)) {
+      setError('PIN must contain only digits');
+      return;
+    }
     if (newPin !== confirmPin) {
       setError('PINs do not match');
       return;
     }
 
-    const salt = await generateSalt();
-    const hash = await hashPin(newPin, salt);
-    const ref = doc(db, 'users', user.uid);
-    await setDoc(ref, { parentPinHash: hash, parentPinSalt: salt }, { merge: true });
-    await refreshProfile();
-    setUnlocked(true);
-    sessionStorage.setItem('pinUnlockedAt', String(Date.now()));
-    setNewPin('');
-    setConfirmPin('');
-    setIsSetup(false);
+    try {
+      const salt = await generateSalt();
+      const hash = await hashPin(newPin, salt);
+      const ref = doc(db, 'users', user.uid);
+      await setDoc(ref, { parentPinHash: hash, parentPinSalt: salt }, { merge: true });
+      await refreshProfile();
+      setUnlocked(true);
+      sessionStorage.setItem('pinUnlockedAt', String(Date.now()));
+      setNewPin('');
+      setConfirmPin('');
+      setIsSetup(false);
+    } catch (err) {
+      console.error('PIN setup failed:', err);
+      setError('Failed to save PIN. Check console for details.');
+    }
   }
 
   if (unlocked) {
