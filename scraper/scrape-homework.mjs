@@ -98,13 +98,9 @@ async function scrapeHomework() {
 
     console.log('Logging in...');
     // Try multiple common selectors for email/username field
-    const emailSelector = '#username, #email, input[name="username"], input[name="email"], input[name="Email"], input[type="email"], input[name="UserId"], #UserId';
-    const passSelector = '#password, input[name="password"], input[name="Password"], input[type="password"]';
-    const submitSelector = 'button[type="submit"], input[type="submit"], .login-btn, #login-btn, .btn-primary';
-
-    await page.fill(emailSelector, MCAS_EMAIL);
-    await page.fill(passSelector, MCAS_PASSWORD);
-    await page.click(submitSelector);
+    await page.fill('#EmailTextBox', MCAS_EMAIL);
+    await page.fill('#PasswordTextBox', MCAS_PASSWORD);
+    await page.click('#LoginButton');
 
     // Wait for post-login navigation
     await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
