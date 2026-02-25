@@ -10,8 +10,7 @@
 import { chromium } from 'playwright';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
-import { readFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cron from 'node-cron';
@@ -62,28 +61,12 @@ if (!existsSync(saPath)) {
 const DEFAULT_SCRAPE_TIMES = ['15:30', '18:00', '21:00'];
 
 const serviceAccount = JSON.parse(readFileSync(saPath, 'utf-8'));
-const STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.project_id}.firebasestorage.app`;
-initializeApp({ credential: cert(serviceAccount), storageBucket: STORAGE_BUCKET });
+initializeApp({ credential: cert(serviceAccount) });
 const fsDb = getFirestore();
-const bucket = getStorage().bucket();
 
 // Ensure directories exist
 mkdirSync(resolve(__dirname, 'debug'), { recursive: true });
-
-// ── Helpers ─────────────────────────────────────────────────────────────
-function guessMime(filename) {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  const map = {
-    pdf: 'application/pdf', doc: 'application/msword',
-    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    xls: 'application/vnd.ms-excel',
-    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    ppt: 'application/vnd.ms-powerpoint',
-    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', zip: 'application/zip',
-  };
-  return map[ext] || 'application/octet-stream';
-}
+mkdirSync(resolve(__dirname, 'resources'), { recursive: true });
 
 // ── Scrape MCAS ─────────────────────────────────────────────────────────
 async function scrapeHomework() {
@@ -273,19 +256,12 @@ async function scrapeHomework() {
               const response = await page.context().request.get(link.url);
               if (response.ok()) {
                 const safeName = `${item.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${link.name}`;
+                const filePath = resolve(__dirname, 'resources', safeName);
                 const buffer = await response.body();
-
-                // Upload to Firebase Storage
-                const storagePath = `homework-resources/${FIREBASE_UID}/${safeName}`;
-                const file = bucket.file(storagePath);
-                await file.save(buffer, {
-                  metadata: { contentType: guessMime(link.name) },
-                });
-                await file.makePublic();
-                const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
-
-                console.log(`  Uploaded: ${safeName} (${buffer.length} bytes)`);
-                downloadedFiles.push({ name: link.name, url: publicUrl });
+                writeFileSync(filePath, buffer);
+                console.log(`  Downloaded: ${safeName} (${buffer.length} bytes)`);
+                // URL path served by nginx from shared volume
+                downloadedFiles.push({ name: link.name, url: `/resources/${encodeURIComponent(safeName)}` });
               } else {
                 console.log(`  HTTP ${response.status()} for: ${link.name}`);
                 downloadedFiles.push({ name: link.name, url: link.url });
