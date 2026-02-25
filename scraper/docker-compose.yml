@@ -3,6 +3,7 @@ services:
     build: .
     env_file: .env
     volumes:
+      - ./.env:/app/.env:ro
       - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
       - ./debug:/app/debug
     environment:
