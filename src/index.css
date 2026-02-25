@@ -703,3 +703,176 @@ body {
   font-size: 0.9rem;
   font-weight: 500;
 }
+
+/* ===== Homework Banner (Dashboard) ===== */
+.hw-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.hw-banner-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: #f59e0b;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ===== Homework Page ===== */
+.hw-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hw-header h2 {
+  font-size: 1.15rem;
+}
+
+.hw-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--color-surface);
+  padding: 16px;
+  border-radius: var(--radius);
+}
+
+.hw-add-form input {
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.hw-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--color-text-muted);
+}
+
+.hw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hw-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 12px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.hw-card--done {
+  opacity: 0.6;
+  border-color: var(--color-success);
+  background: #f0fdf4;
+}
+
+.hw-check {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.hw-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hw-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hw-title--done {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}
+
+.hw-subject {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.hw-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.hw-due {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.hw-overdue {
+  color: var(--color-danger);
+}
+
+.hw-due-today {
+  color: #f59e0b;
+}
+
+.hw-due-soon {
+  color: #ea580c;
+}
+
+.hw-delete {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0;
+  line-height: 1;
+}
+
+.hw-delete:hover {
+  color: var(--color-danger);
+}
+
+.hw-completed-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

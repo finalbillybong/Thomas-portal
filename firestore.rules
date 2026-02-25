@@ -12,6 +12,11 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
 
+      // Homework subcollection
+      match /homework/{homeworkId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
       // Daily status subcollection
       match /dailyStatus/{dateKey} {
         allow read, write: if request.auth != null && request.auth.uid == uid;

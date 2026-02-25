@@ -1,10 +1,13 @@
+import { Link } from 'react-router-dom';
 import { usePortals } from '../hooks/usePortals';
 import { usePortalCheck } from '../hooks/usePortalCheck';
+import { useHomework } from '../hooks/useHomework';
 import { PortalCard } from '../components/PortalCard';
 
 export function Dashboard() {
   const { enabledPortals, loading } = usePortals();
   const { checkedPortalIds, tapPortal } = usePortalCheck();
+  const { pending: pendingHomework } = useHomework();
 
   if (loading) {
     return (
@@ -39,6 +42,13 @@ export function Dashboard() {
           </p>
         )}
       </div>
+
+      {pendingHomework.length > 0 && (
+        <Link to="/homework" className="hw-banner">
+          <span className="hw-banner-count">{pendingHomework.length}</span>
+          <span>homework {pendingHomework.length === 1 ? 'item' : 'items'} due</span>
+        </Link>
+      )}
 
       <div className="portal-grid">
         {enabledPortals.map((portal) => (
