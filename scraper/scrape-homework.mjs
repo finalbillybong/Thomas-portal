@@ -49,11 +49,12 @@ loadEnv();
 const MCAS_EMAIL = process.env.MCAS_EMAIL;
 const MCAS_PASSWORD = process.env.MCAS_PASSWORD;
 const MCAS_CHILD_NAME = process.env.MCAS_CHILD_NAME;
+const MCAS_SCHOOL_NAME = process.env.MCAS_SCHOOL_NAME;
 const FIREBASE_UID = process.env.FIREBASE_UID;
 const SA_KEY_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS || './serviceAccountKey.json';
 
-if (!MCAS_EMAIL || !MCAS_PASSWORD || !FIREBASE_UID || !MCAS_CHILD_NAME) {
-  console.error('Missing required env vars: MCAS_EMAIL, MCAS_PASSWORD, MCAS_CHILD_NAME, FIREBASE_UID');
+if (!MCAS_EMAIL || !MCAS_PASSWORD || !FIREBASE_UID || !MCAS_CHILD_NAME || !MCAS_SCHOOL_NAME) {
+  console.error('Missing required env vars: MCAS_EMAIL, MCAS_PASSWORD, MCAS_CHILD_NAME, MCAS_SCHOOL_NAME, FIREBASE_UID');
   process.exit(1);
 }
 
@@ -106,6 +107,18 @@ async function scrapeHomework() {
       // Maybe no selection screen, or different layout — save a screenshot for debugging
       console.log(`No child selection found for "${MCAS_CHILD_NAME}" — may already be selected or page layout differs`);
       await page.screenshot({ path: resolve(__dirname, 'debug/child-selection.png'), fullPage: true });
+    }
+
+    // Handle school selection
+    const schoolLink = await page.$(`a:has-text("${MCAS_SCHOOL_NAME}"), button:has-text("${MCAS_SCHOOL_NAME}"), [class*="school"]:has-text("${MCAS_SCHOOL_NAME}"), [class*="estab"]:has-text("${MCAS_SCHOOL_NAME}")`);
+    if (schoolLink) {
+      console.log(`Selecting school: ${MCAS_SCHOOL_NAME}`);
+      await schoolLink.click();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(2000);
+    } else {
+      console.log(`No school selection found for "${MCAS_SCHOOL_NAME}" — may already be selected or page layout differs`);
+      await page.screenshot({ path: resolve(__dirname, 'debug/school-selection.png'), fullPage: true });
     }
 
     // Navigate to homework section
