@@ -129,34 +129,35 @@ async function scrapeHomework() {
     // Page shows multiple rows, each with a child name + school.
     // We need to click the row that contains BOTH the child name and school name.
     if (page.url().includes('ContactSelect')) {
-      console.log('On contact selection page, looking for child+school combo...');
+      console.log('On contact selection page...');
 
-      // Find all clickable rows/links, pick the one containing both names
-      const selected = await page.evaluate((childName, schoolName) => {
-        // Look through all links and clickable elements
-        const candidates = document.querySelectorAll('a, tr[onclick], div[onclick], .row, [class*="contact"], [class*="select"]');
-        for (const el of candidates) {
-          const text = el.textContent || '';
-          if (text.includes(schoolName)) {
-            return { found: true, text: text.trim().slice(0, 120), tag: el.tagName, id: el.id, className: el.className };
-          }
-        }
-        return { found: false };
-      }, MCAS_CHILD_NAME, MCAS_SCHOOL_NAME);
+      // Dump full page HTML for debugging (the links have no visible text)
+      const pageInfo = await page.evaluate(() => {
+        const items = document.querySelectorAll('.avatar-container-item, a');
+        return Array.from(items).map((el, i) => {
+          return `[${i}] tag=${el.tagName} class=${el.className} href=${el.href} innerHTML=${el.innerHTML.slice(0, 200)}`;
+        }).join('\n');
+      });
+      console.log('Contact page elements:\n' + pageInfo);
 
-      console.log('Selection search result:', JSON.stringify(selected));
+      // The avatar-container-item links seem to be the selection items
+      // Since there are 3, and the user wants the bottom (last) one for John Spendluffe
+      // Click the last avatar-container-item (index -1)
+      const avatarItems = page.locator('.avatar-container-item');
+      const count = await avatarItems.count();
+      console.log(`Found ${count} avatar-container-item elements`);
 
-      // Click the element containing the school name (since that's unique between the two rows)
-      const contactLink = await page.locator(`a:has-text("${MCAS_SCHOOL_NAME}"), tr:has-text("${MCAS_SCHOOL_NAME}"), div:has-text("${MCAS_SCHOOL_NAME}")`).first();
-      if (await contactLink.count() > 0) {
-        console.log(`Clicking entry for: ${MCAS_SCHOOL_NAME}`);
-        await contactLink.click();
+      if (count > 0) {
+        // Click the last one (bottom entry = John Spendluffe)
+        const lastItem = avatarItems.nth(count - 1);
+        console.log(`Clicking avatar item ${count - 1} (last/bottom)...`);
+        await lastItem.click();
         await page.waitForLoadState('networkidle');
         await page.waitForTimeout(2000);
         await dumpPage('After contact selection');
         await page.screenshot({ path: resolve(__dirname, 'debug/after-contact.png'), fullPage: true });
       } else {
-        console.log('Could not find matching contact row');
+        console.log('No avatar-container-item elements found');
         await page.screenshot({ path: resolve(__dirname, 'debug/contact-selection-fail.png'), fullPage: true });
       }
     }
