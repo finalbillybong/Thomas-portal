@@ -175,55 +175,89 @@ async function scrapeHomework() {
     await page.screenshot({ path: resolve(__dirname, 'debug/homework-page.png'), fullPage: true });
     console.log('Saved debug screenshot to debug/homework-page.png');
 
-    // Scrape homework items
-    // MCAS homework pages typically show a table or card list with:
-    // - Subject, Title, Set date, Due date, Teacher
-    //
-    // This selector will need adjusting based on the actual page structure.
-    // Run once with headless:false to see what the page looks like,
-    // then update the selectors below.
+    // Scrape homework items from MCAS homework table
+    // Table columns: School | Subject | Homework Title | Subject Teacher | Assigned Date | Due Date | Resources | Score | ...
     const items = await page.evaluate(() => {
       const homework = [];
 
-      // Strategy 1: Table rows (common MCAS layout)
-      const rows = document.querySelectorAll('table tbody tr, .homework-item, .hw-row, [class*="homework"]');
+      // Find the homework table by looking for a table with the right headers
+      const tables = document.querySelectorAll('table');
+      let homeworkTable = null;
+      let colMap = {};
+
+      for (const table of tables) {
+        const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent?.trim().toLowerCase() || '');
+        const hasSubject = headers.some(h => h.includes('subject') && !h.includes('teacher'));
+        const hasTitle = headers.some(h => h.includes('homework') || h.includes('title'));
+        const hasDue = headers.some(h => h.includes('due'));
+
+        if (hasSubject && (hasTitle || hasDue)) {
+          homeworkTable = table;
+          // Build column index map from headers
+          headers.forEach((h, i) => {
+            if (h.includes('subject') && !h.includes('teacher')) colMap.subject = i;
+            else if (h.includes('homework') || h.includes('title')) colMap.title = i;
+            else if (h.includes('subject') && h.includes('teacher')) colMap.teacher = i;
+            else if (h.includes('assigned') || h.includes('set')) colMap.setDate = i;
+            else if (h.includes('due')) colMap.dueDate = i;
+            else if (h.includes('resource')) colMap.resources = i;
+          });
+          break;
+        }
+      }
+
+      if (!homeworkTable) {
+        // Dump all tables for debugging
+        const debug = [];
+        tables.forEach((t, i) => {
+          const ths = Array.from(t.querySelectorAll('th')).map(th => th.textContent?.trim().slice(0, 25));
+          const rowCount = t.querySelectorAll('tbody tr').length;
+          debug.push(`Table[${i}]: ${rowCount} rows, headers: [${ths.join(' | ')}]`);
+        });
+        return { items: [], debug: debug.join('\n'), html: document.body.innerHTML.slice(0, 3000) };
+      }
+
+      const rows = homeworkTable.querySelectorAll('tbody tr');
       for (const row of rows) {
         const cells = row.querySelectorAll('td');
-        if (cells.length >= 3) {
-          homework.push({
-            title: cells[1]?.textContent?.trim() || cells[0]?.textContent?.trim() || '',
-            subject: cells[0]?.textContent?.trim() || '',
-            dueDate: cells[2]?.textContent?.trim() || cells[3]?.textContent?.trim() || '',
-            setDate: cells.length >= 4 ? cells[2]?.textContent?.trim() : undefined,
-            teacher: cells.length >= 5 ? cells[4]?.textContent?.trim() : undefined,
-          });
-          continue;
+        if (cells.length < 3) continue;
+
+        const title = colMap.title !== undefined ? cells[colMap.title]?.textContent?.trim() : '';
+        const subject = colMap.subject !== undefined ? cells[colMap.subject]?.textContent?.trim() : '';
+        const dueDate = colMap.dueDate !== undefined ? cells[colMap.dueDate]?.textContent?.trim() : '';
+        const setDate = colMap.setDate !== undefined ? cells[colMap.setDate]?.textContent?.trim() : undefined;
+        const teacher = colMap.teacher !== undefined ? cells[colMap.teacher]?.textContent?.trim() : undefined;
+
+        // Grab resource info (e.g. "2 Files") and any download links
+        let resources = null;
+        if (colMap.resources !== undefined && cells[colMap.resources]) {
+          const resCell = cells[colMap.resources];
+          const resText = resCell.textContent?.trim();
+          if (resText && resText !== 'N/A') {
+            const links = Array.from(resCell.querySelectorAll('a')).map(a => ({
+              name: a.textContent?.trim(),
+              url: a.href,
+            }));
+            resources = { text: resText, links };
+          }
         }
 
-        // Strategy 2: Div-based cards
-        const title = row.querySelector('[class*="title"], h3, h4, strong')?.textContent?.trim();
-        const subject = row.querySelector('[class*="subject"]')?.textContent?.trim();
-        const due = row.querySelector('[class*="due"], [class*="date"]')?.textContent?.trim();
-
-        if (title) {
-          homework.push({ title, subject: subject || '', dueDate: due || '' });
+        if (title && title !== 'N/A') {
+          homework.push({ title, subject, dueDate, setDate, teacher, resources });
         }
       }
 
-      // Strategy 3: If neither worked, grab the page HTML for debugging
-      if (homework.length === 0) {
-        return { items: [], html: document.body.innerHTML.slice(0, 5000) };
-      }
-
-      return { items: homework, html: null };
+      return { items: homework, debug: `colMap: ${JSON.stringify(colMap)}, rows: ${homeworkTable.querySelectorAll('tbody tr').length}`, html: null };
     });
 
+    if (items.debug) {
+      console.log('Table parsing info:', items.debug);
+    }
+
     if (items.html) {
-      console.log('\n--- Could not parse homework. Page HTML preview: ---');
+      console.log('\n--- Could not find homework table. Page HTML preview: ---');
       console.log(items.html);
       console.log('--- End HTML preview ---\n');
-      console.log('You need to update the selectors in scrape-homework.mjs');
-      console.log('Run with headless:false and inspect the page structure.');
       await browser.close();
       return [];
     }
@@ -303,6 +337,7 @@ async function syncToFirestore(items) {
       dueDate,
       setDate: parseDate(item.setDate) || null,
       teacher: item.teacher || null,
+      resources: item.resources || null,
       completed: false,
       completedAt: null,
       source: 'mcas',
@@ -312,7 +347,8 @@ async function syncToFirestore(items) {
     };
 
     await colRef.add(doc);
-    console.log(`Added: ${item.title} — ${item.subject} (due ${dueDate})`);
+    const resInfo = item.resources ? ` [${item.resources.text}]` : '';
+    console.log(`Added: ${item.title} — ${item.subject} (due ${dueDate}, teacher: ${item.teacher || 'N/A'})${resInfo}`);
     added++;
   }
 

@@ -37,6 +37,11 @@ export type AuditEventType =
   | 'PORTAL_REORDER'
   | 'RESET_TODAY';
 
+export interface HomeworkResource {
+  text: string;
+  links: { name: string; url: string }[];
+}
+
 export interface HomeworkItem {
   id: string;
   title: string;
@@ -44,6 +49,7 @@ export interface HomeworkItem {
   dueDate: string; // ISO date string YYYY-MM-DD
   setDate?: string;
   teacher?: string;
+  resources?: HomeworkResource | null;
   completed: boolean;
   completedAt?: number;
   source: 'mcas' | 'manual';

@@ -62,7 +62,10 @@ function HomeworkCard({
         <span className={`hw-title ${item.completed ? 'hw-title--done' : ''}`}>
           {item.title}
         </span>
-        <span className="hw-subject">{item.subject}</span>
+        <span className="hw-subject">{item.subject}{item.teacher ? ` — ${item.teacher}` : ''}</span>
+        {item.resources && (
+          <span className="hw-resources">{item.resources.text}</span>
+        )}
       </div>
       <div className="hw-right">
         <span className={`hw-due ${dueDateClass(item.dueDate)}`}>

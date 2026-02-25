@@ -830,6 +830,10 @@ body {
   font-size: 0.8rem;
   color: var(--color-text-muted);
 }
+.hw-resources {
+  font-size: 0.75rem;
+  color: var(--color-primary);
+}
 
 .hw-right {
   display: flex;
