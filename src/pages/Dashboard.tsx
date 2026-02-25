@@ -97,8 +97,21 @@ function HomeworkCard({
           {item.title}
         </span>
         <span className="hw-subject">{item.subject}{item.teacher ? ` \u2014 ${item.teacher}` : ''}</span>
-        {item.resources && (
-          <span className="hw-resources">{item.resources.text}</span>
+        {item.resources && item.resources.links && item.resources.links.length > 0 && (
+          <div className="hw-resources">
+            {item.resources.links.map((link, idx) => (
+              <a
+                key={idx}
+                className="hw-resource-link"
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {link.name}
+              </a>
+            ))}
+          </div>
         )}
       </div>
       <div className="hw-right">
