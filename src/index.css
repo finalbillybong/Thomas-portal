@@ -876,3 +876,53 @@ body {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ===== Scrape Times Settings ===== */
+.setting-row--column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.scrape-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.scrape-time-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.scrape-time-remove {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0 2px;
+  line-height: 1;
+}
+.scrape-time-remove:hover {
+  color: #fff;
+}
+
+.scrape-time-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.time-input--sm {
+  padding: 4px 6px;
+  font-size: 0.85rem;
+}

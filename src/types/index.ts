@@ -64,7 +64,7 @@ export interface UserProfile {
   parentPinHash: string;
   parentPinSalt: string;
   auditEnabled: boolean;
-  scrapeTime?: string; // HH:MM format, default "16:00"
+  scrapeTimes?: string[]; // HH:MM times, default ["15:30","18:00","21:00"]
   lastScrapedAt?: number;
 }
 

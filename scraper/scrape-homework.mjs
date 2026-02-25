@@ -58,7 +58,7 @@ if (!existsSync(saPath)) {
   process.exit(1);
 }
 
-const DEFAULT_SCRAPE_TIME = '16:00';
+const DEFAULT_SCRAPE_TIMES = ['15:30', '18:00', '21:00'];
 
 const serviceAccount = JSON.parse(readFileSync(saPath, 'utf-8'));
 initializeApp({ credential: cert(serviceAccount) });
@@ -421,14 +421,19 @@ async function runScrape() {
 }
 
 // ── Read schedule from Firestore ────────────────────────────────────────
-async function getScrapeTime() {
+async function getScrapeTimes() {
   try {
     const snap = await fsDb.collection('users').doc(FIREBASE_UID).get();
-    if (snap.exists && snap.data()?.scrapeTime) return snap.data().scrapeTime;
+    const data = snap.exists ? snap.data() : null;
+    // Support new array format or legacy single-time field
+    if (data?.scrapeTimes && Array.isArray(data.scrapeTimes) && data.scrapeTimes.length > 0) {
+      return [...data.scrapeTimes].sort();
+    }
+    if (data?.scrapeTime) return [data.scrapeTime];
   } catch (err) {
-    console.error('Failed to read scrapeTime:', err.message);
+    console.error('Failed to read scrapeTimes:', err.message);
   }
-  return DEFAULT_SCRAPE_TIME;
+  return DEFAULT_SCRAPE_TIMES;
 }
 
 function timeToCron(time) {
@@ -444,26 +449,37 @@ async function main() {
   // Run once on startup
   await runScrape();
 
-  // Set up cron
-  let currentTime = await getScrapeTime();
-  let cronExpr = timeToCron(currentTime);
-  console.log(`\nScheduled daily at ${currentTime} (${cronExpr})`);
+  // Set up cron tasks for each configured time
+  let currentTimes = await getScrapeTimes();
+  let tasks = [];
 
-  let task = cron.schedule(cronExpr, () => runScrape(), { timezone: 'Europe/London' });
+  function scheduleTasks(times) {
+    // Stop any existing tasks
+    for (const t of tasks) t.stop();
+    tasks = [];
 
-  // Re-check schedule every 30 min
+    for (const time of times) {
+      const expr = timeToCron(time);
+      console.log(`  Scheduled: ${time} (${expr})`);
+      tasks.push(cron.schedule(expr, () => runScrape(), { timezone: 'Europe/London' }));
+    }
+  }
+
+  console.log(`\nScrape schedule (${currentTimes.length} times/day):`);
+  scheduleTasks(currentTimes);
+
+  // Re-check schedule every 30 min for user changes in Settings
   setInterval(async () => {
-    const newTime = await getScrapeTime();
-    if (newTime !== currentTime) {
-      console.log(`Schedule changed: ${currentTime} -> ${newTime}`);
-      currentTime = newTime;
-      task.stop();
-      task = cron.schedule(timeToCron(newTime), () => runScrape(), { timezone: 'Europe/London' });
-      console.log(`Rescheduled to ${newTime}`);
+    const newTimes = await getScrapeTimes();
+    const changed = JSON.stringify(newTimes) !== JSON.stringify(currentTimes);
+    if (changed) {
+      console.log(`\nSchedule changed: [${currentTimes.join(', ')}] -> [${newTimes.join(', ')}]`);
+      currentTimes = newTimes;
+      scheduleTasks(newTimes);
     }
   }, 30 * 60 * 1000);
 
-  console.log('Service running. Checking for schedule changes every 30 min.\n');
+  console.log('\nService running. Checking for schedule changes every 30 min.\n');
 }
 
 main().catch((err) => {

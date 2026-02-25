@@ -5,10 +5,15 @@ import { logAuditEvent } from '../../lib/auditLog';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
+const DEFAULT_SCRAPE_TIMES = ['15:30', '18:00', '21:00'];
+
 export function SettingsHome() {
   const { user, profile, refreshProfile } = useAuth();
   const { resetToday } = usePortalCheck();
-  const [scrapeTime, setScrapeTime] = useState(profile?.scrapeTime || '16:00');
+  const [scrapeTimes, setScrapeTimes] = useState<string[]>(
+    profile?.scrapeTimes ?? DEFAULT_SCRAPE_TIMES,
+  );
+  const [newTime, setNewTime] = useState('');
 
   async function handleResetToday() {
     if (!confirm('Reset all checked portals for today?')) return;
@@ -29,12 +34,24 @@ export function SettingsHome() {
     await refreshProfile();
   }
 
-  async function handleScrapeTimeChange(newTime: string) {
-    setScrapeTime(newTime);
+  async function saveTimes(times: string[]) {
+    const sorted = [...times].sort();
+    setScrapeTimes(sorted);
     if (!user) return;
     const ref = doc(db, 'users', user.uid);
-    await setDoc(ref, { scrapeTime: newTime }, { merge: true });
+    await setDoc(ref, { scrapeTimes: sorted }, { merge: true });
     await refreshProfile();
+  }
+
+  function handleAddTime() {
+    if (!newTime || scrapeTimes.includes(newTime)) return;
+    saveTimes([...scrapeTimes, newTime]);
+    setNewTime('');
+  }
+
+  function handleRemoveTime(time: string) {
+    if (scrapeTimes.length <= 1) return;
+    saveTimes(scrapeTimes.filter((t) => t !== time));
   }
 
   return (
@@ -66,17 +83,42 @@ export function SettingsHome() {
         </label>
       </div>
 
-      <div className="setting-row">
+      <div className="setting-row setting-row--column">
         <div>
-          <strong>Homework scrape time</strong>
-          <p>When to check MCAS for new homework daily</p>
+          <strong>Homework scrape times</strong>
+          <p>When to check MCAS for new homework each day</p>
         </div>
-        <input
-          type="time"
-          value={scrapeTime}
-          onChange={(e) => handleScrapeTimeChange(e.target.value)}
-          className="time-input"
-        />
+        <div className="scrape-times">
+          {scrapeTimes.map((time) => (
+            <span key={time} className="scrape-time-chip">
+              {time}
+              {scrapeTimes.length > 1 && (
+                <button
+                  className="scrape-time-remove"
+                  onClick={() => handleRemoveTime(time)}
+                  aria-label={`Remove ${time}`}
+                >
+                  x
+                </button>
+              )}
+            </span>
+          ))}
+          <span className="scrape-time-add">
+            <input
+              type="time"
+              value={newTime}
+              onChange={(e) => setNewTime(e.target.value)}
+              className="time-input time-input--sm"
+            />
+            <button
+              className="btn btn-sm btn-primary"
+              onClick={handleAddTime}
+              disabled={!newTime || scrapeTimes.includes(newTime)}
+            >
+              Add
+            </button>
+          </span>
+        </div>
       </div>
     </div>
   );
