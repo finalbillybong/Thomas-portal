@@ -36,6 +36,9 @@ export function useHomework() {
       // Hide items more than 7 days past due date
       setHomework(items.filter((item) => !isExpired(item)));
       setLoading(false);
+    }, (err) => {
+      console.error('Homework snapshot error:', err);
+      setLoading(false);
     });
 
     return unsub;

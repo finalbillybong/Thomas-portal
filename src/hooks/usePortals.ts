@@ -47,6 +47,9 @@ export function usePortals() {
       })) as Portal[];
       setPortals(items);
       setLoading(false);
+    }, (err) => {
+      console.error('Portals snapshot error:', err);
+      setLoading(false);
     });
 
     return unsub;
