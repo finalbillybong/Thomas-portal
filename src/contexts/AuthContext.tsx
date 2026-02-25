@@ -54,7 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
-        await fetchProfile(u);
+        try {
+          await fetchProfile(u);
+        } catch (err) {
+          console.error('Failed to fetch profile:', err);
+          setProfile(null);
+        }
       } else {
         setProfile(null);
       }
