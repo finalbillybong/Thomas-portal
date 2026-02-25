@@ -159,6 +159,9 @@ async function scrapeHomework() {
         return { items: [], debug: debug.join('\n'), html: document.body.innerHTML.slice(0, 3000) };
       }
 
+      // Mark the table so Playwright can target it outside evaluate
+      homeworkTable.setAttribute('data-hw-scraper', 'true');
+
       const rows = homeworkTable.querySelectorAll('tbody tr');
       for (const row of rows) {
         const cells = row.querySelectorAll('td');
@@ -208,7 +211,7 @@ async function scrapeHomework() {
       console.log(`Fetching resources for: ${item.title}...`);
       try {
         const resColIdx = tableData.colMap.resources + 1;
-        const resCell = page.locator(`table tbody tr:nth-child(${i + 1}) td:nth-child(${resColIdx})`);
+        const resCell = page.locator(`table[data-hw-scraper] tbody tr:nth-child(${i + 1}) td:nth-child(${resColIdx})`);
         const clickTarget = resCell.locator('a, button, [onclick]').first();
         const hasClickable = await clickTarget.count();
 
@@ -220,35 +223,46 @@ async function scrapeHomework() {
         await page.waitForTimeout(2000);
         await page.screenshot({ path: resolve(__dirname, `debug/resource-popup-${i}.png`), fullPage: true });
 
-        // Grab file links from any modal/popup
+        // Find file download links — look for <a> tags whose visible text
+        // ends with a known file extension (e.g. "Y7 Term 3 Spelling Homework.pdf")
         const fileLinks = await page.evaluate(() => {
+          const extRe = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|png|jpg|jpeg)$/i;
           const links = [];
-          const containers = document.querySelectorAll(
-            '.modal, .popup, [class*="modal"], [class*="dialog"], [role="dialog"], .fancybox-inner, .fancybox-wrap, .modal-body, .modal-content'
-          );
-          for (const c of containers) {
-            for (const a of c.querySelectorAll('a[href]')) {
-              if (a.href && !a.href.includes('javascript:') && !a.href.endsWith('#')) {
-                links.push({ name: a.textContent?.trim() || 'file', url: a.href });
-              }
-            }
-          }
-          if (links.length === 0) {
-            for (const a of document.querySelectorAll('a[href*="Download"], a[href*="download"], a[href*=".pdf"], a[href*=".doc"]')) {
-              links.push({ name: a.textContent?.trim() || 'file', url: a.href });
+          const seen = new Set();
+
+          for (const a of document.querySelectorAll('a[href]')) {
+            const href = a.href;
+            const text = a.textContent?.trim() || '';
+            if (!href || href.includes('javascript:') || href.endsWith('#') || seen.has(href)) continue;
+
+            // Match by link text ending in a file extension (most reliable)
+            // or by href containing a file extension
+            if (extRe.test(text) || extRe.test(decodeURIComponent(href.split('?')[0]))) {
+              seen.add(href);
+              links.push({ name: text || 'file', url: href });
             }
           }
           return links;
         });
 
         if (fileLinks.length > 0) {
-          console.log(`  Found ${fileLinks.length} file links`);
+          console.log(`  Found ${fileLinks.length} file links:`);
+          for (const fl of fileLinks) console.log(`    - ${fl.name} => ${fl.url.slice(0, 120)}`);
           const downloadedFiles = [];
           for (const link of fileLinks) {
             try {
-              const downloadPromise = page.waitForEvent('download', { timeout: 15000 }).catch(() => null);
-              await page.evaluate((url) => { window.open(url, '_blank'); }, link.url);
-              const download = await downloadPromise;
+              // Click the link directly and catch the download event
+              const linkEl = page.locator(`a:text-is("${link.name}")`).first();
+              const hasLink = await linkEl.count();
+
+              let download = null;
+              if (hasLink > 0) {
+                [download] = await Promise.all([
+                  page.waitForEvent('download', { timeout: 15000 }).catch(() => null),
+                  linkEl.click(),
+                ]);
+              }
+
               if (download) {
                 const filename = download.suggestedFilename();
                 const safeName = `${item.subject.replace(/[^a-zA-Z0-9]/g, '_')}_${filename}`;
@@ -256,6 +270,7 @@ async function scrapeHomework() {
                 console.log(`  Downloaded: ${safeName}`);
                 downloadedFiles.push({ name: filename, path: safeName });
               } else {
+                console.log(`  No download triggered for: ${link.name}`);
                 downloadedFiles.push({ name: link.name, url: link.url });
               }
             } catch (dlErr) {
