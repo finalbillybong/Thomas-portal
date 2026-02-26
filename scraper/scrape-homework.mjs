@@ -45,8 +45,8 @@ const MCAS_SCHOOL_NAME = process.env.MCAS_SCHOOL_NAME;
 const FIREBASE_UID = process.env.FIREBASE_UID;
 const SA_KEY_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS || './serviceAccountKey.json';
 
-if (!MCAS_EMAIL || !MCAS_PASSWORD || !FIREBASE_UID || !MCAS_CHILD_NAME || !MCAS_SCHOOL_NAME) {
-  console.error('Missing required env vars: MCAS_EMAIL, MCAS_PASSWORD, MCAS_CHILD_NAME, MCAS_SCHOOL_NAME, FIREBASE_UID');
+if (!MCAS_EMAIL || !MCAS_PASSWORD || !FIREBASE_UID) {
+  console.error('Missing required env vars: MCAS_EMAIL, MCAS_PASSWORD, FIREBASE_UID');
   process.exit(1);
 }
 
@@ -88,17 +88,61 @@ async function scrapeHomework() {
     await page.waitForTimeout(3000);
     console.log('Logged in. URL:', page.url());
 
-    // Handle contact selection page
+    // Handle contact selection page (multi-child / multi-school accounts)
     if (page.url().includes('ContactSelect')) {
       console.log('On contact selection page...');
       const avatarItems = page.locator('.avatar-container-item');
       const count = await avatarItems.count();
-      if (count > 0) {
-        const lastItem = avatarItems.nth(count - 1);
-        console.log(`Clicking avatar item ${count - 1} (last/bottom)...`);
+
+      if (count === 0) {
+        console.log('No avatar items found on contact selection page');
+      } else {
+        // Read all available options so we can match or report them
+        const options = [];
+        for (let i = 0; i < count; i++) {
+          const text = (await avatarItems.nth(i).textContent() || '').trim();
+          options.push({ index: i, text });
+        }
+        console.log(`Found ${count} contact option(s):`);
+        for (const opt of options) console.log(`  [${opt.index}] ${opt.text}`);
+
+        let target = null;
+
+        if (MCAS_CHILD_NAME || MCAS_SCHOOL_NAME) {
+          // Match by child name and/or school name (case-insensitive substring)
+          const childLower = MCAS_CHILD_NAME?.toLowerCase();
+          const schoolLower = MCAS_SCHOOL_NAME?.toLowerCase();
+
+          for (const opt of options) {
+            const lower = opt.text.toLowerCase();
+            const childMatch = !childLower || lower.includes(childLower);
+            const schoolMatch = !schoolLower || lower.includes(schoolLower);
+            if (childMatch && schoolMatch) {
+              target = opt;
+              break;
+            }
+          }
+
+          if (!target) {
+            console.error(`No contact matches MCAS_CHILD_NAME="${MCAS_CHILD_NAME || ''}" / MCAS_SCHOOL_NAME="${MCAS_SCHOOL_NAME || ''}"`);
+            console.error('Available options are listed above — update your .env to match one of them.');
+            await browser.close();
+            return [];
+          }
+        } else if (count === 1) {
+          // Only one option and no env vars set — just pick it
+          target = options[0];
+        } else {
+          console.error('Multiple contacts found but MCAS_CHILD_NAME / MCAS_SCHOOL_NAME not set.');
+          console.error('Add these to your .env to select the right contact. Available options are listed above.');
+          await browser.close();
+          return [];
+        }
+
+        console.log(`Selecting: [${target.index}] ${target.text}`);
         await Promise.all([
           page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {}),
-          lastItem.click(),
+          avatarItems.nth(target.index).click(),
         ]);
         await page.waitForLoadState('domcontentloaded');
         await page.waitForTimeout(3000);
