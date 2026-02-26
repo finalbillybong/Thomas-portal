@@ -342,7 +342,28 @@ async function syncToFirestore(items) {
   });
 
   let added = 0;
+  let removed = 0;
   const now = Date.now();
+
+  // Build set of keys from what MCAS currently shows
+  const scrapedKeys = new Set();
+  for (const item of items) {
+    const dueDate = parseDate(item.dueDate);
+    if (item.title && dueDate) {
+      scrapedKeys.add(`${item.title}__${dueDate}`);
+    }
+  }
+
+  // Remove MCAS-sourced homework no longer on the portal
+  for (const snap of existing.docs) {
+    const data = snap.data();
+    const key = `${data.title}__${data.dueDate}`;
+    if (!scrapedKeys.has(key)) {
+      await colRef.doc(snap.id).delete();
+      console.log(`Removed (no longer on MCAS): ${data.title} (due ${data.dueDate})`);
+      removed++;
+    }
+  }
 
   for (const item of items) {
     const dueDate = parseDate(item.dueDate);
@@ -376,7 +397,7 @@ async function syncToFirestore(items) {
     added++;
   }
 
-  console.log(`Sync: ${added} new, ${items.length - added} skipped`);
+  console.log(`Sync: ${added} new, ${removed} removed, ${items.length - added} skipped`);
 }
 
 // ── Archive old homework (7+ days past due) ─────────────────────────────

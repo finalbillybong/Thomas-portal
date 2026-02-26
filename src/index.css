@@ -938,9 +938,7 @@ body {
 .hw-title {
   font-weight: 600;
   font-size: 0.95rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .hw-title--done {
