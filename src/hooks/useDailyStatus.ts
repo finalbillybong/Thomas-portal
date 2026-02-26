@@ -45,7 +45,7 @@ export function useDailyStatus() {
         {
           checkedPortalIds: arrayUnion(portalId),
           lastUpdatedAt: Date.now(),
-          timezone: 'Europe/Amsterdam',
+          timezone: 'Europe/London',
         },
         { merge: true },
       );

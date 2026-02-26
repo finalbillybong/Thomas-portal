@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 
-const TZ = 'Europe/Amsterdam';
+const TZ = 'Europe/London';
 
 export function getTodayKey(): string {
   return DateTime.now().setZone(TZ).toFormat('yyyy-MM-dd');

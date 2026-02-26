@@ -57,19 +57,19 @@ function getDaysInfo(dateStr: string): { text: string; className: string } {
 
 function formatLastScraped(ts: number | undefined): string {
   if (!ts) return 'Never';
-  const d = new Date(ts);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const scraped = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const tz = 'Europe/London';
+  const time = new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz });
+  const scrapedDate = new Date(ts).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz });
+  const todayDate = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz });
 
-  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  if (scraped.getTime() === today.getTime()) return `Today ${time}`;
+  if (scrapedDate === todayDate) return `Today ${time}`;
 
-  const yesterday = new Date(today);
+  const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  if (scraped.getTime() === yesterday.getTime()) return `Yesterday ${time}`;
+  const yesterdayDate = yesterday.toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz });
+  if (scrapedDate === yesterdayDate) return `Yesterday ${time}`;
 
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ` ${time}`;
+  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: tz }) + ` ${time}`;
 }
 
 function HomeworkCard({
