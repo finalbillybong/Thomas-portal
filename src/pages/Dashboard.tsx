@@ -5,6 +5,8 @@ import { useHomework } from '../hooks/useHomework';
 import { useAuth } from '../contexts/AuthContext';
 import { PortalCard } from '../components/PortalCard';
 import { getTodayKey } from '../lib/dateUtils';
+import { verifyPin } from '../lib/pinUtils';
+import { logAuditEvent } from '../lib/auditLog';
 import type { HomeworkItem, Portal } from '../types';
 
 // Subject colour mapping
@@ -134,10 +136,27 @@ function portalMatchesHomework(portal: Portal, pendingHomework: HomeworkItem[]):
 
 export function Dashboard() {
   const { enabledPortals, loading: portalsLoading } = usePortals();
-  const { checkedPortalIds, tapPortal } = usePortalCheck();
+  const { checkedPortalIds, tapPortal, resetToday } = usePortalCheck();
   const { pending, completed, loading: hwLoading, toggleComplete } = useHomework();
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showResetPin, setShowResetPin] = useState(false);
+  const [resetPin, setResetPin] = useState('');
+  const [resetError, setResetError] = useState('');
+
+  async function handleReset() {
+    if (!user || !profile) return;
+    setResetError('');
+    const valid = await verifyPin(resetPin, profile.parentPinSalt, profile.parentPinHash);
+    if (!valid) {
+      setResetError('Incorrect PIN');
+      return;
+    }
+    await resetToday();
+    await logAuditEvent(user.uid, profile.auditEnabled, 'RESET_TODAY');
+    setShowResetPin(false);
+    setResetPin('');
+  }
 
   if (portalsLoading || hwLoading) {
     return (
@@ -213,9 +232,38 @@ export function Dashboard() {
 
       {/* Portal check section */}
       <div className={`status-banner ${allDone ? 'status-banner--done' : ''}`}>
-        <h2>
-          Checked {checkedCount} / {totalCount} portals today
-        </h2>
+        <div className="status-banner-header">
+          <h2>
+            Checked {checkedCount} / {totalCount} portals today
+          </h2>
+          {checkedCount > 0 && profile?.parentPinHash && (
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={() => { setShowResetPin(!showResetPin); setResetError(''); setResetPin(''); }}
+            >
+              Reset
+            </button>
+          )}
+        </div>
+        {showResetPin && (
+          <div className="reset-pin-row">
+            <input
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="Enter PIN"
+              value={resetPin}
+              onChange={(e) => setResetPin(e.target.value)}
+              className="reset-pin-input"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleReset(); }}
+            />
+            <button className="btn btn-sm btn-danger" onClick={handleReset}>
+              Confirm
+            </button>
+            {resetError && <span className="reset-pin-error">{resetError}</span>}
+          </div>
+        )}
         {allDone ? (
           <p className="status-message">All done for today!</p>
         ) : (

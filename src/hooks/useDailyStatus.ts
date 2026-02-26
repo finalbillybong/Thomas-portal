@@ -59,7 +59,7 @@ export function useDailyStatus() {
     await setDoc(ref, {
       checkedPortalIds: [],
       lastUpdatedAt: Date.now(),
-      timezone: 'Europe/Amsterdam',
+      timezone: 'Europe/London',
     });
   }, [user, todayKey]);
 

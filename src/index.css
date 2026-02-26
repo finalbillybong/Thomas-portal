@@ -293,9 +293,36 @@ body {
   background: #f0fdf4;
 }
 
+.status-banner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .status-banner h2 {
   font-size: 1.1rem;
   margin-bottom: 4px;
+}
+
+.reset-pin-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.reset-pin-input {
+  width: 100px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}
+
+.reset-pin-error {
+  color: var(--color-danger);
+  font-size: 0.8rem;
 }
 
 .status-message {
