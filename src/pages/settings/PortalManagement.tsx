@@ -27,6 +27,8 @@ interface PortalFormData {
   deepLinkUrl: string;
   icon: string;
   enabled: boolean;
+  loginUsername: string;
+  loginPassword: string;
 }
 
 const emptyForm: PortalFormData = {
@@ -35,6 +37,8 @@ const emptyForm: PortalFormData = {
   deepLinkUrl: '',
   icon: '\uD83C\uDF10',
   enabled: true,
+  loginUsername: '',
+  loginPassword: '',
 };
 
 function SortablePortalItem({
@@ -113,6 +117,8 @@ export function PortalManagement() {
       deepLinkUrl: portal.deepLinkUrl,
       icon: portal.icon,
       enabled: portal.enabled,
+      loginUsername: portal.loginUsername || '',
+      loginPassword: portal.loginPassword || '',
     });
     setShowForm(true);
   }
@@ -233,6 +239,31 @@ export function PortalManagement() {
                 }
               />
             </label>
+            <fieldset className="credential-fieldset">
+              <legend>Login Credentials (optional)</legend>
+              <label>
+                Username
+                <input
+                  type="text"
+                  value={form.loginUsername}
+                  onChange={(e) =>
+                    setForm({ ...form, loginUsername: e.target.value })
+                  }
+                  autoComplete="off"
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="text"
+                  value={form.loginPassword}
+                  onChange={(e) =>
+                    setForm({ ...form, loginPassword: e.target.value })
+                  }
+                  autoComplete="off"
+                />
+              </label>
+            </fieldset>
             <label className="checkbox-label">
               <input
                 type="checkbox"

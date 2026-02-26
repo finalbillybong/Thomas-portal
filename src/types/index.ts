@@ -6,6 +6,8 @@ export interface Portal {
   icon: string;
   sortOrder: number;
   enabled: boolean;
+  loginUsername?: string;
+  loginPassword?: string;
   createdAt: number;
   updatedAt: number;
 }
