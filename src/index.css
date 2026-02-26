@@ -634,6 +634,13 @@ body {
   gap: 8px !important;
 }
 
+.field-hint {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
 .credential-fieldset {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);

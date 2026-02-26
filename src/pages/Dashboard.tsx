@@ -5,7 +5,7 @@ import { useHomework } from '../hooks/useHomework';
 import { useAuth } from '../contexts/AuthContext';
 import { PortalCard } from '../components/PortalCard';
 import { getTodayKey } from '../lib/dateUtils';
-import type { HomeworkItem } from '../types';
+import type { HomeworkItem, Portal } from '../types';
 
 // Subject colour mapping
 const SUBJECT_COLOURS: Record<string, string> = {
@@ -121,6 +121,17 @@ function HomeworkCard({
   );
 }
 
+function portalMatchesHomework(portal: Portal, pendingHomework: HomeworkItem[]): boolean {
+  const keywords = portal.keywords;
+  if (!keywords || keywords.length === 0) return true; // no keywords = always show
+  if (pendingHomework.length === 0) return true; // no homework = show all
+
+  return pendingHomework.some((hw) => {
+    const haystack = `${hw.subject} ${hw.title}`.toLowerCase();
+    return keywords.some((kw) => haystack.includes(kw));
+  });
+}
+
 export function Dashboard() {
   const { enabledPortals, loading: portalsLoading } = usePortals();
   const { checkedPortalIds, tapPortal } = usePortalCheck();
@@ -136,13 +147,17 @@ export function Dashboard() {
     );
   }
 
-  const checkedCount = enabledPortals.filter((p) =>
+  const relevantPortals = enabledPortals.filter((p) =>
+    portalMatchesHomework(p, pending),
+  );
+
+  const checkedCount = relevantPortals.filter((p) =>
     checkedPortalIds.includes(p.id),
   ).length;
-  const totalCount = enabledPortals.length;
+  const totalCount = relevantPortals.length;
   const allDone = checkedCount === totalCount && totalCount > 0;
 
-  const remaining = enabledPortals.filter(
+  const remaining = relevantPortals.filter(
     (p) => !checkedPortalIds.includes(p.id),
   );
 
@@ -212,7 +227,7 @@ export function Dashboard() {
       </div>
 
       <div className="portal-grid">
-        {enabledPortals.map((portal) => (
+        {relevantPortals.map((portal) => (
           <PortalCard
             key={portal.id}
             portal={portal}

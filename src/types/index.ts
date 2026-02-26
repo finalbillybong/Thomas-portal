@@ -8,6 +8,7 @@ export interface Portal {
   enabled: boolean;
   loginUsername?: string;
   loginPassword?: string;
+  keywords?: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -78,6 +79,7 @@ export const DEFAULT_PORTALS: Omit<Portal, 'id' | 'createdAt' | 'updatedAt'>[] =
     icon: '\uD83D\uDCDA',
     sortOrder: 0,
     enabled: true,
+    keywords: [],
   },
   {
     name: 'Sparx Maths',
@@ -86,6 +88,7 @@ export const DEFAULT_PORTALS: Omit<Portal, 'id' | 'createdAt' | 'updatedAt'>[] =
     icon: '\u2795',
     sortOrder: 1,
     enabled: true,
+    keywords: ['maths'],
   },
   {
     name: 'Sparx Science',
@@ -94,6 +97,7 @@ export const DEFAULT_PORTALS: Omit<Portal, 'id' | 'createdAt' | 'updatedAt'>[] =
     icon: '\uD83E\uDDEA',
     sortOrder: 2,
     enabled: true,
+    keywords: ['science'],
   },
   {
     name: 'Educake',
@@ -102,6 +106,7 @@ export const DEFAULT_PORTALS: Omit<Portal, 'id' | 'createdAt' | 'updatedAt'>[] =
     icon: '\uD83C\uDF93',
     sortOrder: 3,
     enabled: true,
+    keywords: ['science'],
   },
   {
     name: 'Seneca',
@@ -110,5 +115,6 @@ export const DEFAULT_PORTALS: Omit<Portal, 'id' | 'createdAt' | 'updatedAt'>[] =
     icon: '\uD83E\uDDE0',
     sortOrder: 4,
     enabled: true,
+    keywords: [],
   },
 ];

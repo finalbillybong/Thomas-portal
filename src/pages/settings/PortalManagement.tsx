@@ -29,6 +29,7 @@ interface PortalFormData {
   enabled: boolean;
   loginUsername: string;
   loginPassword: string;
+  keywords: string;
 }
 
 const emptyForm: PortalFormData = {
@@ -39,6 +40,7 @@ const emptyForm: PortalFormData = {
   enabled: true,
   loginUsername: '',
   loginPassword: '',
+  keywords: '',
 };
 
 function SortablePortalItem({
@@ -119,6 +121,7 @@ export function PortalManagement() {
       enabled: portal.enabled,
       loginUsername: portal.loginUsername || '',
       loginPassword: portal.loginPassword || '',
+      keywords: (portal.keywords || []).join(', '),
     });
     setShowForm(true);
   }
@@ -127,8 +130,15 @@ export function PortalManagement() {
     e.preventDefault();
     if (!user || !profile) return;
 
+    const keywords = form.keywords
+      .split(',')
+      .map((k) => k.trim().toLowerCase())
+      .filter(Boolean);
+    const { keywords: _kw, ...formRest } = form;
+    const portalData = { ...formRest, keywords };
+
     if (editing) {
-      await updatePortal(editing.id, form);
+      await updatePortal(editing.id, portalData);
       await logAuditEvent(
         user.uid,
         profile.auditEnabled,
@@ -140,7 +150,7 @@ export function PortalManagement() {
       const maxSort = portals.length > 0
         ? Math.max(...portals.map((p) => p.sortOrder))
         : -1;
-      const newId = await addPortal({ ...form, sortOrder: maxSort + 1 });
+      const newId = await addPortal({ ...portalData, sortOrder: maxSort + 1 });
       await logAuditEvent(
         user.uid,
         profile.auditEnabled,
@@ -238,6 +248,20 @@ export function PortalManagement() {
                   setForm({ ...form, deepLinkUrl: e.target.value })
                 }
               />
+            </label>
+            <label>
+              Homework Keywords (comma-separated)
+              <input
+                type="text"
+                value={form.keywords}
+                onChange={(e) =>
+                  setForm({ ...form, keywords: e.target.value })
+                }
+                placeholder="e.g. maths, science"
+              />
+              <span className="field-hint">
+                Only show this portal when homework matches these keywords. Leave empty to always show.
+              </span>
             </label>
             <fieldset className="credential-fieldset">
               <legend>Login Credentials (optional)</legend>
