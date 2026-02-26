@@ -1,4 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#4f46e5"/>
-  <text x="256" y="300" text-anchor="middle" font-size="240" font-family="Arial, sans-serif" font-weight="bold" fill="white">HH</text>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Open book -->
+  <g transform="translate(256,240)">
+    <!-- Left page -->
+    <path d="M-12,-80 Q-12,-90 -22,-90 L-120,-90 Q-140,-90 -140,-70 L-140,60 Q-140,80 -120,80 L-12,80 Z" fill="white" opacity="0.95"/>
+    <!-- Right page -->
+    <path d="M12,-80 Q12,-90 22,-90 L120,-90 Q140,-90 140,-70 L140,60 Q140,80 120,80 L12,80 Z" fill="white" opacity="0.85"/>
+    <!-- Spine -->
+    <path d="M-12,-80 Q0,-65 12,-80" fill="none" stroke="white" stroke-width="3" opacity="0.6"/>
+    <path d="M-12,80 Q0,65 12,80" fill="none" stroke="white" stroke-width="3" opacity="0.6"/>
+    <!-- Lines on left page -->
+    <line x1="-115" y1="-55" x2="-30" y2="-55" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round"/>
+    <line x1="-115" y1="-30" x2="-45" y2="-30" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round"/>
+    <line x1="-115" y1="-5" x2="-35" y2="-5" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round"/>
+    <line x1="-115" y1="20" x2="-50" y2="20" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round"/>
+    <!-- Lines on right page -->
+    <line x1="30" y1="-55" x2="115" y2="-55" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round"/>
+    <line x1="30" y1="-30" x2="100" y2="-30" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round"/>
+    <line x1="30" y1="-5" x2="110" y2="-5" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round"/>
+    <line x1="30" y1="20" x2="95" y2="20" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <!-- Checkmark circle -->
+  <g transform="translate(370,340)">
+    <circle r="52" fill="#22c55e"/>
+    <circle r="48" fill="#22c55e" stroke="white" stroke-width="4"/>
+    <polyline points="-20,0 -6,16 24,-16" fill="none" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>
