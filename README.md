@@ -97,15 +97,19 @@ cp scraper/.env.example scraper/.env
 ```env
 MCAS_EMAIL=parent@example.com
 MCAS_PASSWORD=your-mcas-password
-MCAS_CHILD_NAME=Your Child Name
-MCAS_SCHOOL_NAME=Your School Name
 FIREBASE_UID=your-firebase-user-uid
 GOOGLE_APPLICATION_CREDENTIALS=./serviceAccountKey.json
+
+# Optional — only needed for multi-child / multi-school accounts:
+MCAS_CHILD_NAME=
+MCAS_SCHOOL_NAME=
 ```
 
 Place the Firebase service account JSON key at `scraper/serviceAccountKey.json`.
 
 > **Finding your Firebase UID:** Sign up in the app first, then find your UID in the Firebase Console under Authentication > Users.
+
+> **Multi-child accounts:** If your MCAS login has more than one child or school, set `MCAS_CHILD_NAME` and/or `MCAS_SCHOOL_NAME` to match the text shown on the MCAS contact selection page (case-insensitive, partial match). If you're not sure what to put, leave them blank and run the scraper once — it will log all available options.
 
 ### 3. Build and Run
 
