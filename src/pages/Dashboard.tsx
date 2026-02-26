@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { usePortals } from '../hooks/usePortals';
 import { usePortalCheck } from '../hooks/usePortalCheck';
 import { useHomework } from '../hooks/useHomework';
@@ -134,6 +134,43 @@ function portalMatchesHomework(portal: Portal, pendingHomework: HomeworkItem[]):
   });
 }
 
+const PULL_THRESHOLD = 80;
+
+function usePullToRefresh() {
+  const startY = useRef(0);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      startY.current = e.touches[0].clientY;
+    } else {
+      startY.current = 0;
+    }
+  }, []);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!startY.current) return;
+    const delta = e.touches[0].clientY - startY.current;
+    if (delta > 0) {
+      setPullDistance(Math.min(delta * 0.5, 120));
+    }
+  }, []);
+
+  const onTouchEnd = useCallback(() => {
+    if (pullDistance >= PULL_THRESHOLD && !refreshing) {
+      setRefreshing(true);
+      setPullDistance(PULL_THRESHOLD);
+      setTimeout(() => window.location.reload(), 300);
+    } else {
+      setPullDistance(0);
+    }
+    startY.current = 0;
+  }, [pullDistance, refreshing]);
+
+  return { pullDistance, refreshing, onTouchStart, onTouchMove, onTouchEnd };
+}
+
 export function Dashboard() {
   const { enabledPortals, loading: portalsLoading } = usePortals();
   const { checkedPortalIds, tapPortal, resetToday } = usePortalCheck();
@@ -143,6 +180,7 @@ export function Dashboard() {
   const [showResetPin, setShowResetPin] = useState(false);
   const [resetPin, setResetPin] = useState('');
   const [resetError, setResetError] = useState('');
+  const { pullDistance, refreshing, onTouchStart, onTouchMove, onTouchEnd } = usePullToRefresh();
 
   async function handleReset() {
     if (!user || !profile) return;
@@ -181,7 +219,25 @@ export function Dashboard() {
   );
 
   return (
-    <div className="dashboard">
+    <div
+      className="dashboard"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {pullDistance > 0 && (
+        <div
+          className="pull-indicator"
+          style={{ height: pullDistance }}
+        >
+          <span className={`pull-arrow ${pullDistance >= PULL_THRESHOLD ? 'pull-arrow--ready' : ''} ${refreshing ? 'pull-arrow--spinning' : ''}`}>
+            {refreshing ? '\u21BB' : '\u2193'}
+          </span>
+          <span className="pull-text">
+            {refreshing ? 'Refreshing...' : pullDistance >= PULL_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}
+          </span>
+        </div>
+      )}
       {/* Homework section */}
       <div className="hw-section">
         <div className="hw-section-header">

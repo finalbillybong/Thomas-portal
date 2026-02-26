@@ -10,7 +10,7 @@
 import { chromium } from 'playwright';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import cron from 'node-cron';
@@ -359,6 +359,23 @@ async function syncToFirestore(items) {
     const data = snap.data();
     const key = `${data.title}__${data.dueDate}`;
     if (!scrapedKeys.has(key)) {
+      // Delete associated resource files from disk
+      if (data.resources?.links?.length) {
+        for (const link of data.resources.links) {
+          if (link.url?.startsWith('/resources/')) {
+            const fileName = decodeURIComponent(link.url.replace('/resources/', ''));
+            const filePath = resolve(__dirname, 'resources', fileName);
+            if (existsSync(filePath)) {
+              try {
+                unlinkSync(filePath);
+                console.log(`  Deleted resource file: ${fileName}`);
+              } catch (err) {
+                console.log(`  Failed to delete ${fileName}: ${err.message}`);
+              }
+            }
+          }
+        }
+      }
       await colRef.doc(snap.id).delete();
       console.log(`Removed (no longer on MCAS): ${data.title} (due ${data.dueDate})`);
       removed++;
@@ -414,6 +431,23 @@ async function archiveOldHomework() {
     const due = new Date(data.dueDate + 'T23:59:59');
     const daysPast = (now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24);
     if (daysPast > 7) {
+      // Delete associated resource files from disk
+      if (data.resources?.links?.length) {
+        for (const link of data.resources.links) {
+          if (link.url?.startsWith('/resources/')) {
+            const fileName = decodeURIComponent(link.url.replace('/resources/', ''));
+            const filePath = resolve(__dirname, 'resources', fileName);
+            if (existsSync(filePath)) {
+              try {
+                unlinkSync(filePath);
+                console.log(`  Deleted resource file: ${fileName}`);
+              } catch (err) {
+                console.log(`  Failed to delete ${fileName}: ${err.message}`);
+              }
+            }
+          }
+        }
+      }
       await archiveRef.doc(snap.id).set({ ...data, archivedAt: Date.now() });
       await colRef.doc(snap.id).delete();
       console.log(`Archived: ${data.title} (due ${data.dueDate})`);
